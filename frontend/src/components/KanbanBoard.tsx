@@ -1,6 +1,9 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { MoreVertical, Clock, MessageSquare, Briefcase, RefreshCw, Calendar, Tag, User as UserIcon, Info, X } from 'lucide-react';
+import { 
+  MoreVertical, Clock, MessageSquare, Briefcase, RefreshCw, Calendar, 
+  Tag, User as UserIcon, Info, X, Check, AlertCircle 
+} from 'lucide-react';
 import { api, Lead, User as UserType } from '@/lib/api';
 import { LeadDrawer } from './LeadDrawer';
 
@@ -12,6 +15,13 @@ const COLUMNS = [
   { id: 'venda_perdida', title: 'Venda Perdida', color: 'border-red-500', bg: 'bg-red-500/5', help: 'Negociação encerrada sem fechamento.' },
 ];
 
+export interface ToastMessage {
+  id: string;
+  type: 'success' | 'error' | 'info';
+  title: string;
+  message: string;
+}
+
 export function KanbanBoard() {
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -20,6 +30,22 @@ export function KanbanBoard() {
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [users, setUsers] = useState<UserType[]>([]);
   const [outcomeModal, setOutcomeModal] = useState<{ isOpen: boolean, type: 'venda_realizada' | 'venda_perdida' | null, leadId: string | null }>({ isOpen: false, type: null, leadId: null });
+  const [activeMenuLeadId, setActiveMenuLeadId] = useState<string | null>(null);
+  
+  // Custom Toast System (UX Mobile-First)
+  const [toasts, setToasts] = useState<ToastMessage[]>([]);
+
+  const addToast = (type: 'success' | 'error' | 'info', title: string, message: string) => {
+    const id = Math.random().toString(36).substring(2, 9);
+    setToasts((prev) => [...prev, { id, type, title, message }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 4000);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  };
   
   // Estados para os Forms dos Modais
   const [outcomeForm, setOutcomeForm] = useState<any>({});
@@ -44,6 +70,7 @@ export function KanbanBoard() {
       setLeads(filtered);
     } catch (err) {
       console.error(err);
+      addToast('error', 'Erro de Sincronização', 'Não foi possível carregar os dados comerciais do servidor.');
     } finally {
       setLoading(false);
     }
@@ -71,7 +98,7 @@ export function KanbanBoard() {
     // Intercepta arraste para colunas de fechamento
     if (targetStatus === 'venda_realizada' || targetStatus === 'venda_perdida') {
       setOutcomeForm({}); // Reseta o form
-      setOutcomeModal({ isOpen: true, type: targetStatus, leadId });
+      setOutcomeModal({ isOpen: true, type: targetStatus as 'venda_realizada' | 'venda_perdida', leadId });
       return;
     }
 
@@ -83,7 +110,9 @@ export function KanbanBoard() {
     const updated = await api.updateLeadStatus(leadId, targetStatus);
     if (!updated) {
       setLeads(originalLeads);
+      addToast('error', 'Falha na Transição', 'Não foi possível salvar o novo status do lead no banco de dados.');
     } else {
+      addToast('success', 'Fase Atualizada', 'O lead foi movido com sucesso no funil comercial.');
       fetchLeads();
     }
   };
@@ -100,16 +129,17 @@ export function KanbanBoard() {
     
     // Tratamento numérico para valor da venda
     if (updateData.sale_value) {
-      updateData.sale_value = parseFloat(updateData.sale_value.replace(/[^0-9.-]+/g,""));
+      updateData.sale_value = parseFloat(updateData.sale_value.toString().replace(/[^0-9.-]+/g,""));
     }
     
     const success = await api.updateLead(outcomeModal.leadId, updateData);
     if (success) {
       setOutcomeModal({ isOpen: false, type: null, leadId: null });
+      addToast('success', 'Negócio Concluído', outcomeModal.type === 'venda_realizada' ? 'Parabéns! Venda registrada com sucesso.' : 'Lead arquivado como venda perdida.');
       fetchLeads();
     } else {
       setLoading(false);
-      alert('Erro ao atualizar lead e registrar fechamento.');
+      addToast('error', 'Erro de Gravação', 'Não foi possível registrar o fechamento do lead.');
     }
   };
 
@@ -122,7 +152,7 @@ export function KanbanBoard() {
     return (
       <div className="flex justify-center items-center h-[500px] space-x-2 text-foreground/50">
         <RefreshCw className="animate-spin text-primary" size={24} />
-        <span className="font-medium text-sm">Carregando leads corporativos...</span>
+        <span className="font-medium text-sm">Carregando leads comerciais...</span>
       </div>
     );
   }
@@ -139,7 +169,7 @@ export function KanbanBoard() {
   };
 
   return (
-    <div className="flex h-full min-h-[600px] space-x-4 overflow-x-auto pb-6 select-none">
+    <div className="flex h-full min-h-[600px] space-x-4 overflow-x-auto pb-6 select-none relative">
       {COLUMNS.map((col) => {
         const colLeads = leads.filter(l => l.status === col.id);
         const isOver = dragOverColumn === col.id;
@@ -197,9 +227,70 @@ export function KanbanBoard() {
                           {lead.source || 'IMAP'}
                         </span>
                       </div>
-                      <button className="text-foreground/30 hover:text-foreground transition-colors shrink-0">
-                        <MoreVertical size={14} />
-                      </button>
+
+                      {/* Botão de Transição Touch / Mobile-Friendly */}
+                      <div className="relative shrink-0">
+                        <button 
+                          onClick={(e) => {
+                            e.stopPropagation(); // Evita abrir o drawer do lead
+                            setActiveMenuLeadId(activeMenuLeadId === lead.id ? null : lead.id);
+                          }}
+                          className="p-1 hover:bg-foreground/5 rounded-full transition-all text-foreground/30 hover:text-foreground cursor-pointer"
+                          title="Alterar fase do lead"
+                        >
+                          <MoreVertical size={14} />
+                        </button>
+                        
+                        {activeMenuLeadId === lead.id && (
+                          <>
+                            <div className="fixed inset-0 z-20" onClick={(e) => { e.stopPropagation(); setActiveMenuLeadId(null); }} />
+                            <div className="absolute right-0 mt-1 w-48 bg-card border border-border rounded-xl shadow-xl p-1 z-30 animate-in fade-in slide-in-from-top-1 duration-200">
+                              <div className="px-2.5 py-1.5 border-b border-border/60 text-[9px] font-bold uppercase text-foreground/40 tracking-wider">
+                                Mudar para Etapa
+                              </div>
+                              <div className="py-1">
+                                {COLUMNS.map((phase) => (
+                                  <button
+                                    key={phase.id}
+                                    onClick={async (e) => {
+                                      e.stopPropagation();
+                                      setActiveMenuLeadId(null);
+                                      if (phase.id === lead.status) return;
+                                      
+                                      // Intercepta para colunas de fechamento
+                                      if (phase.id === 'venda_realizada' || phase.id === 'venda_perdida') {
+                                        setOutcomeForm({});
+                                        setOutcomeModal({ isOpen: true, type: phase.id, leadId: lead.id });
+                                        return;
+                                      }
+                                      
+                                      const originalLeads = [...leads];
+                                      setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: phase.id } : l));
+                                      
+                                      const updated = await api.updateLeadStatus(lead.id, phase.id);
+                                      if (!updated) {
+                                        setLeads(originalLeads);
+                                        addToast('error', 'Falha na Transição', `Não foi possível mover o lead para a fase ${phase.title}`);
+                                      } else {
+                                        addToast('success', 'Fase Atualizada', `Lead "${lead.name}" movido para ${phase.title}`);
+                                        fetchLeads();
+                                      }
+                                    }}
+                                    className={`w-full text-left px-3 py-1.5 text-xs font-semibold rounded-lg flex items-center justify-between transition-colors ${
+                                      lead.status === phase.id
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'hover:bg-foreground/5 text-foreground/75 hover:text-foreground'
+                                    }`}
+                                  >
+                                    {phase.title}
+                                    {lead.status === phase.id && <Check size={12} className="text-primary" />}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
                     
                     <div className="pl-2">
@@ -441,6 +532,37 @@ export function KanbanBoard() {
           </div>
         </div>
       )}
+
+      {/* TOAST SYSTEM CONTAINER */}
+      <div className="fixed bottom-4 right-4 z-[9999] flex flex-col space-y-2 w-full max-w-[360px] px-4 pointer-events-none">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`pointer-events-auto p-4 rounded-xl shadow-lg border backdrop-blur-md flex items-start space-x-3 transition-all duration-300 animate-in slide-in-from-bottom-5 ${
+              toast.type === 'success'
+                ? 'bg-emerald-950/90 border-emerald-500/30 text-emerald-200'
+                : toast.type === 'error'
+                ? 'bg-red-950/90 border-red-500/30 text-red-200'
+                : 'bg-slate-900/90 border-slate-700/30 text-slate-200'
+            }`}
+          >
+            {toast.type === 'success' && <Check className="text-emerald-400 shrink-0 mt-0.5" size={16} />}
+            {toast.type === 'error' && <AlertCircle className="text-red-400 shrink-0 mt-0.5" size={16} />}
+            {toast.type === 'info' && <Info className="text-slate-400 shrink-0 mt-0.5" size={16} />}
+            
+            <div className="flex-1">
+              <h4 className="text-xs font-bold uppercase tracking-wider">{toast.title}</h4>
+              <p className="text-xs text-foreground/80 mt-1 leading-relaxed">{toast.message}</p>
+            </div>
+            <button
+              onClick={() => removeToast(toast.id)}
+              className="text-xs text-foreground/40 hover:text-foreground shrink-0 cursor-pointer p-0.5 rounded-full hover:bg-foreground/5"
+            >
+              ✕
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

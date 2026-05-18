@@ -14,8 +14,11 @@ router = APIRouter()
 # --- LEADS ---
 
 @router.get("/leads", response_model=List[crm.LeadResponse], tags=["Leads"])
-def get_leads(db: Session = Depends(get_db)):
-    """Busca todos os leads e realiza o auto-arquivamento de leads inativos."""
+def get_leads(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """Busca todos os leads filtrados de forma segura a nível comercial."""
     # Auto-Arquivamento (Zero Cost - sem CRON)
     threshold_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
     
@@ -30,10 +33,29 @@ def get_leads(db: Session = Depends(get_db)):
             l.is_archived = True
         db.commit()
 
-    return db.query(models.Lead).order_by(models.Lead.created_at.desc()).all()
+    query = db.query(models.Lead)
+    
+    # Restrição de Escopo de Visualização Rígida (Database Level Isolation)
+    if current_user.role == models.RoleEnum.vendedor:
+        # Vendedor só vê leads atribuídos a si mesmo
+        query = query.filter(models.Lead.assigned_to_id == current_user.id)
+    elif current_user.role == models.RoleEnum.gestor:
+        # Gestor visualiza os leads do seu próprio time comercial + leads órfãos/não distribuídos
+        if current_user.team_id:
+            membros = db.query(models.User.id).filter(models.User.team_id == current_user.team_id).subquery()
+            query = query.filter(
+                (models.Lead.assigned_to_id.in_(membros)) | 
+                (models.Lead.assigned_to_id == None)
+            )
+
+    return query.order_by(models.Lead.created_at.desc()).all()
 
 @router.post("/leads", response_model=crm.LeadResponse, tags=["Leads"], status_code=status.HTTP_201_CREATED)
-def create_lead(lead_in: crm.LeadCreate, db: Session = Depends(get_db)):
+def create_lead(
+    lead_in: crm.LeadCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Cria um novo lead e gera a atividade inicial com distribuição automática."""
     lead_data = lead_in.model_dump()
     
@@ -63,11 +85,20 @@ def create_lead(lead_in: crm.LeadCreate, db: Session = Depends(get_db)):
     return lead
 
 @router.patch("/leads/{lead_id}", response_model=crm.LeadResponse, tags=["Leads"])
-def update_lead(lead_id: UUID, lead_in: crm.LeadUpdate, db: Session = Depends(get_db)):
+def update_lead(
+    lead_id: UUID, 
+    lead_in: crm.LeadUpdate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Atualiza informações do lead, como status ou responsável."""
     lead = db.query(models.Lead).filter(models.Lead.id == lead_id).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
+        
+    # Restrição de Escopo: Vendedor comum só pode editar seus próprios leads
+    if current_user.role == models.RoleEnum.vendedor and lead.assigned_to_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Você não tem permissão de edição para este lead.")
     
     update_data = lead_in.model_dump(exclude_unset=True)
     status_changed = False
@@ -93,7 +124,7 @@ def update_lead(lead_id: UUID, lead_in: crm.LeadUpdate, db: Session = Depends(ge
         activity = models.Activity(
             lead_id=lead.id,
             activity_type=models.ActivityTypeEnum.status_alterado,
-            content=f"Status alterado de '{old_status.value}' para '{lead.status.value}'."
+            content=f"Status alterado de '{old_status}' para '{lead.status}'."
         )
         db.add(activity)
         
@@ -119,16 +150,35 @@ def update_lead(lead_id: UUID, lead_in: crm.LeadUpdate, db: Session = Depends(ge
 # --- ACTIVITIES ---
 
 @router.get("/leads/{lead_id}/activities", response_model=List[crm.ActivityResponse], tags=["Activities"])
-def get_activities(lead_id: UUID, db: Session = Depends(get_db)):
+def get_activities(
+    lead_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Busca a timeline (histórico) do lead."""
+    lead = db.query(models.Lead).filter(models.Lead.id == lead_id).first()
+    if not lead:
+        raise HTTPException(status_code=404, detail="Lead not found")
+        
+    if current_user.role == models.RoleEnum.vendedor and lead.assigned_to_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para visualizar este lead.")
+        
     return db.query(models.Activity).filter(models.Activity.lead_id == lead_id).order_by(models.Activity.created_at.desc()).all()
 
 @router.post("/leads/{lead_id}/activities", response_model=crm.ActivityResponse, tags=["Activities"])
-def add_activity(lead_id: UUID, activity_in: crm.ActivityCreate, db: Session = Depends(get_db)):
+def add_activity(
+    lead_id: UUID, 
+    activity_in: crm.ActivityCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Adiciona uma nota manual na timeline do lead."""
     lead = db.query(models.Lead).filter(models.Lead.id == lead_id).first()
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
+        
+    if current_user.role == models.RoleEnum.vendedor and lead.assigned_to_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para alterar este lead.")
         
     activity = models.Activity(**activity_in.model_dump())
     db.add(activity)
@@ -145,15 +195,28 @@ def add_activity(lead_id: UUID, activity_in: crm.ActivityCreate, db: Session = D
 # --- TASKS ---
 
 @router.get("/tasks", response_model=List[crm.TaskResponse], tags=["Tasks"])
-def get_tasks(user_id: UUID = None, db: Session = Depends(get_db)):
-    """Busca tarefas da agenda operacional, filtradas opcionalmente pelo vendedor responsável."""
+def get_tasks(
+    user_id: UUID = None, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """Busca tarefas da agenda operacional, filtradas de forma segura de acordo com o papel comercial."""
     query = db.query(models.Task)
-    if user_id:
+    
+    if current_user.role == models.RoleEnum.vendedor:
+        # Vendedor só acessa suas próprias tarefas
+        query = query.filter(models.Task.assigned_to_id == current_user.id)
+    elif user_id:
         query = query.filter(models.Task.assigned_to_id == user_id)
+        
     return query.order_by(models.Task.due_date.asc()).all()
 
 @router.post("/tasks", response_model=crm.TaskResponse, tags=["Tasks"])
-def create_task(task_in: crm.TaskCreate, db: Session = Depends(get_db)):
+def create_task(
+    task_in: crm.TaskCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     task = models.Task(**task_in.model_dump())
     db.add(task)
     db.commit()
@@ -161,10 +224,18 @@ def create_task(task_in: crm.TaskCreate, db: Session = Depends(get_db)):
     return task
 
 @router.patch("/tasks/{task_id}", response_model=crm.TaskResponse, tags=["Tasks"])
-def complete_task(task_id: UUID, task_update: crm.TaskUpdate, db: Session = Depends(get_db)):
+def complete_task(
+    task_id: UUID, 
+    task_update: crm.TaskUpdate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     task = db.query(models.Task).filter(models.Task.id == task_id).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
+        
+    if current_user.role == models.RoleEnum.vendedor and task.assigned_to_id != current_user.id:
+        raise HTTPException(status_code=403, detail="Você não tem permissão para alterar esta tarefa.")
         
     update_data = task_update.model_dump(exclude_unset=True)
     is_completed_changed = False
@@ -193,21 +264,37 @@ def complete_task(task_id: UUID, task_update: crm.TaskUpdate, db: Session = Depe
 # --- SYSTEM LOGS & AUDITING ---
 
 @router.get("/system-logs", response_model=List[crm.SystemLogResponse], tags=["System Logs"])
-def get_system_logs(db: Session = Depends(get_db)):
+def get_system_logs(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Busca os últimos 100 registros de logs do robô de e-mails e SLA para auditoria."""
+    if current_user.role == models.RoleEnum.vendedor:
+        raise HTTPException(status_code=403, detail="Acesso negado. Logs restritos a administradores ou gestores.")
     return db.query(models.SystemLog).order_by(models.SystemLog.created_at.desc()).limit(100).all()
 
 
 # --- TEAMS & USERS MANAGEMENT ---
 
 @router.get("/teams", response_model=List[crm.TeamResponse], tags=["Teams"])
-def get_teams(db: Session = Depends(get_db)):
+def get_teams(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Lista todas as equipes comerciais do sistema."""
+    if current_user.role == models.RoleEnum.vendedor:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
     return db.query(models.Team).all()
 
 @router.post("/teams", response_model=crm.TeamResponse, tags=["Teams"], status_code=status.HTTP_201_CREATED)
-def create_team(team_in: crm.TeamCreate, db: Session = Depends(get_db)):
+def create_team(
+    team_in: crm.TeamCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Cria uma nova equipe comercial."""
+    if current_user.role == models.RoleEnum.vendedor:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
     team = models.Team(**team_in.model_dump())
     db.add(team)
     db.commit()
@@ -215,7 +302,10 @@ def create_team(team_in: crm.TeamCreate, db: Session = Depends(get_db)):
     return team
 
 @router.get("/users", response_model=List[crm.UserResponse], tags=["Users"])
-def get_users(db: Session = Depends(get_db)):
+def get_users(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Lista todos os usuários comerciais cadastrados no CRM."""
     return db.query(models.User).order_by(models.User.name.asc()).all()
 
@@ -263,8 +353,14 @@ def reset_password(payload: crm.ResetPassword, db: Session = Depends(get_db)):
     return {"msg": "Senha redefinida com sucesso."}
 
 @router.post("/users", response_model=crm.UserResponse, tags=["Users"], status_code=status.HTTP_201_CREATED)
-def create_user(user_in: crm.UserCreate, db: Session = Depends(get_db)):
+def create_user(
+    user_in: crm.UserCreate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Cadastra um novo profissional comercial (vendedor, gestor ou admin)."""
+    if current_user.role == models.RoleEnum.vendedor:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
     existing = db.query(models.User).filter(models.User.email == user_in.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Este e-mail já está cadastrado no sistema.")
@@ -281,8 +377,16 @@ def create_user(user_in: crm.UserCreate, db: Session = Depends(get_db)):
     return user
 
 @router.patch("/users/{user_id}", response_model=crm.UserResponse, tags=["Users"])
-def update_user(user_id: UUID, user_in: crm.UserUpdate, team_id: UUID = None, db: Session = Depends(get_db)):
+def update_user(
+    user_id: UUID, 
+    user_in: crm.UserUpdate, 
+    team_id: UUID = None, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Atualiza informações do profissional comercial (aceita body ou query parameter team_id para retrocompatibilidade)."""
+    if current_user.role == models.RoleEnum.vendedor and current_user.id != user_id:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -291,10 +395,14 @@ def update_user(user_id: UUID, user_in: crm.UserUpdate, team_id: UUID = None, db
     
     # Se team_id for passado na query string (retrocompatibilidade)
     if team_id is not None:
+        if current_user.role == models.RoleEnum.vendedor:
+            raise HTTPException(status_code=403, detail="Acesso negado.")
         user.team_id = team_id
         
     # Validação de e-mail duplicado
     if "email" in update_data and update_data["email"] != user.email:
+        if current_user.role == models.RoleEnum.vendedor:
+            raise HTTPException(status_code=403, detail="Acesso negado.")
         existing = db.query(models.User).filter(models.User.email == update_data["email"]).first()
         if existing:
             raise HTTPException(status_code=400, detail="Este e-mail já está cadastrado no sistema.")
@@ -312,8 +420,14 @@ def update_user(user_id: UUID, user_in: crm.UserUpdate, team_id: UUID = None, db
     return user
 
 @router.delete("/users/{user_id}", tags=["Users"])
-def delete_user(user_id: UUID, db: Session = Depends(get_db)):
+def delete_user(
+    user_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Exclui um profissional comercial."""
+    if current_user.role == models.RoleEnum.vendedor:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
@@ -330,8 +444,15 @@ def delete_user(user_id: UUID, db: Session = Depends(get_db)):
     return {"message": "Profissional excluído com sucesso."}
 
 @router.patch("/teams/{team_id}", response_model=crm.TeamResponse, tags=["Teams"])
-def update_team(team_id: UUID, team_in: crm.TeamUpdate, db: Session = Depends(get_db)):
+def update_team(
+    team_id: UUID, 
+    team_in: crm.TeamUpdate, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Edita as informações de uma equipe comercial."""
+    if current_user.role == models.RoleEnum.vendedor:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
     team = db.query(models.Team).filter(models.Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")
@@ -346,8 +467,14 @@ def update_team(team_id: UUID, team_in: crm.TeamUpdate, db: Session = Depends(ge
     return team
 
 @router.delete("/teams/{team_id}", tags=["Teams"])
-def delete_team(team_id: UUID, db: Session = Depends(get_db)):
+def delete_team(
+    team_id: UUID, 
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
     """Exclui uma equipe comercial e desassocia todos os membros dela."""
+    if current_user.role == models.RoleEnum.vendedor:
+        raise HTTPException(status_code=403, detail="Acesso negado.")
     team = db.query(models.Team).filter(models.Team.id == team_id).first()
     if not team:
         raise HTTPException(status_code=404, detail="Team not found")

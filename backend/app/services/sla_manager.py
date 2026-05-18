@@ -20,10 +20,11 @@ def check_sla_violations():
         now = datetime.now(timezone.utc)
         threshold_time = now - timedelta(hours=SLA_HOURS_THRESHOLD)
         
-        # 1. Buscar leads no status 'leads_novos' criados há mais do que o limite e que ainda não foram marcados
+        # 1. Buscar leads no status 'novo' ou 'distribuido' criados há mais do que o limite, sem contato inicial e que ainda não foram marcados
         violating_leads = db.query(models.Lead).filter(
-            models.Lead.status == 'leads_novos',
+            models.Lead.status.in_(['novo', 'distribuido', 'leads_novos', 'leads_pendentes']),
             models.Lead.created_at < threshold_time,
+            models.Lead.last_contact_at == None,
             models.Lead.urgency_level != 'SLA Atrasado'
         ).all()
         

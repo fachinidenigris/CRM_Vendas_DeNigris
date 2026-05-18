@@ -98,11 +98,25 @@ export interface Task {
   task_type: string;
 }
 
+// Wrapper de fetch seguro que injeta automaticamente o cabeçalho Authorization JWT (evita Silent Leak)
+const securedFetch = async (url: string, options: RequestInit = {}): Promise<Response> => {
+  const headers = {
+    ...(options.headers as Record<string, string> || {})
+  };
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('crm_access_token');
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+  }
+  return fetch(url, { ...options, headers });
+};
+
 export const api = {
   // --- USERS & TEAMS ---
   getUsers: async (): Promise<User[]> => {
     try {
-      const res = await fetch(`${API_URL}/users`, { cache: 'no-store' });
+      const res = await securedFetch(`${API_URL}/users`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Falha ao buscar usuários');
       return await res.json();
     } catch (err) {
@@ -113,7 +127,7 @@ export const api = {
 
   createUser: async (user: Omit<User, 'id'>): Promise<User | null> => {
     try {
-      const res = await fetch(`${API_URL}/users`, {
+      const res = await securedFetch(`${API_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(user)
@@ -131,7 +145,7 @@ export const api = {
 
   getTeams: async (): Promise<Team[]> => {
     try {
-      const res = await fetch(`${API_URL}/teams`, { cache: 'no-store' });
+      const res = await securedFetch(`${API_URL}/teams`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Falha ao buscar equipes');
       return await res.json();
     } catch (err) {
@@ -142,7 +156,7 @@ export const api = {
 
   createTeam: async (name: string, managerId?: string | null): Promise<Team | null> => {
     try {
-      const res = await fetch(`${API_URL}/teams`, {
+      const res = await securedFetch(`${API_URL}/teams`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, manager_id: managerId })
@@ -160,7 +174,7 @@ export const api = {
       const url = new URL(`${API_URL}/users/${userId}`);
       if (teamId) url.searchParams.append('team_id', teamId);
       
-      const res = await fetch(url.toString(), {
+      const res = await securedFetch(url.toString(), {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({})
@@ -175,7 +189,7 @@ export const api = {
 
   updateUser: async (userId: string, userUpdate: Partial<Omit<User, 'id'>>): Promise<User | null> => {
     try {
-      const res = await fetch(`${API_URL}/users/${userId}`, {
+      const res = await securedFetch(`${API_URL}/users/${userId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(userUpdate)
@@ -193,7 +207,7 @@ export const api = {
 
   deleteUser: async (userId: string): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_URL}/users/${userId}`, {
+      const res = await securedFetch(`${API_URL}/users/${userId}`, {
         method: 'DELETE'
       });
       if (!res.ok) throw new Error('Falha ao excluir profissional');
@@ -206,7 +220,7 @@ export const api = {
 
   updateTeam: async (teamId: string, name: string, managerId?: string | null): Promise<Team | null> => {
     try {
-      const res = await fetch(`${API_URL}/teams/${teamId}`, {
+      const res = await securedFetch(`${API_URL}/teams/${teamId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name, manager_id: managerId })
@@ -221,7 +235,7 @@ export const api = {
 
   deleteTeam: async (teamId: string): Promise<boolean> => {
     try {
-      const res = await fetch(`${API_URL}/teams/${teamId}`, {
+      const res = await securedFetch(`${API_URL}/teams/${teamId}`, {
         method: 'DELETE'
       });
       if (!res.ok) throw new Error('Falha ao excluir equipe');
@@ -235,7 +249,7 @@ export const api = {
   // --- SYSTEM LOGS ---
   getSystemLogs: async (): Promise<SystemLog[]> => {
     try {
-      const res = await fetch(`${API_URL}/system-logs`, { cache: 'no-store' });
+      const res = await securedFetch(`${API_URL}/system-logs`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Falha ao buscar logs do sistema');
       return await res.json();
     } catch (err) {
@@ -243,9 +257,10 @@ export const api = {
       return [];
     }
   },
+
   getLeads: async (): Promise<Lead[]> => {
     try {
-      const res = await fetch(`${API_URL}/leads`, { cache: 'no-store' });
+      const res = await securedFetch(`${API_URL}/leads`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Falha ao buscar leads');
       return await res.json();
     } catch (err) {
@@ -256,7 +271,7 @@ export const api = {
 
   createLead: async (lead: Omit<Lead, 'id' | 'created_at' | 'last_contact_at'>): Promise<Lead | null> => {
     try {
-      const res = await fetch(`${API_URL}/leads`, {
+      const res = await securedFetch(`${API_URL}/leads`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...lead, source: lead.source || 'Manual' })
@@ -271,7 +286,7 @@ export const api = {
   
   updateLeadStatus: async (leadId: string, status: string): Promise<Lead | null> => {
     try {
-      const res = await fetch(`${API_URL}/leads/${leadId}`, {
+      const res = await securedFetch(`${API_URL}/leads/${leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status })
@@ -286,7 +301,7 @@ export const api = {
 
   updateLead: async (leadId: string, leadUpdate: Partial<Lead>): Promise<Lead | null> => {
     try {
-      const res = await fetch(`${API_URL}/leads/${leadId}`, {
+      const res = await securedFetch(`${API_URL}/leads/${leadId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(leadUpdate)
@@ -301,7 +316,7 @@ export const api = {
 
   getTasks: async (): Promise<Task[]> => {
     try {
-      const res = await fetch(`${API_URL}/tasks`, { cache: 'no-store' });
+      const res = await securedFetch(`${API_URL}/tasks`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Falha ao buscar tarefas');
       return await res.json();
     } catch (err) {
@@ -312,7 +327,7 @@ export const api = {
 
   createTask: async (task: Omit<Task, 'id' | 'is_completed'>): Promise<Task | null> => {
     try {
-      const res = await fetch(`${API_URL}/tasks`, {
+      const res = await securedFetch(`${API_URL}/tasks`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(task)
@@ -327,7 +342,7 @@ export const api = {
 
   completeTask: async (taskId: string, isCompleted: boolean): Promise<Task | null> => {
     try {
-      const res = await fetch(`${API_URL}/tasks/${taskId}`, {
+      const res = await securedFetch(`${API_URL}/tasks/${taskId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_completed: isCompleted })
@@ -342,7 +357,7 @@ export const api = {
 
   getActivities: async (leadId: string): Promise<any[]> => {
     try {
-      const res = await fetch(`${API_URL}/leads/${leadId}/activities`, { cache: 'no-store' });
+      const res = await securedFetch(`${API_URL}/leads/${leadId}/activities`, { cache: 'no-store' });
       if (!res.ok) throw new Error('Falha ao buscar timeline');
       return await res.json();
     } catch (err) {
@@ -353,7 +368,7 @@ export const api = {
 
   addActivity: async (leadId: string, activityType: string, content: string): Promise<any | null> => {
     try {
-      const res = await fetch(`${API_URL}/leads/${leadId}/activities`, {
+      const res = await securedFetch(`${API_URL}/leads/${leadId}/activities`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ lead_id: leadId, activity_type: activityType, content })

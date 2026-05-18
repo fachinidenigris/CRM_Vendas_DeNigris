@@ -87,7 +87,7 @@ def fetch_unread_emails():
         email_ids = messages[0].split()
         
         for e_id in email_ids:
-            status, msg_data = mail.fetch(e_id, "(RFC822)")
+            status, msg_data = mail.fetch(e_id, "(BODY.PEEK[])")
             for response_part in msg_data:
                 if isinstance(response_part, tuple):
                     msg = email.message_from_bytes(response_part[1])
@@ -125,6 +125,8 @@ def fetch_unread_emails():
                     
                     if not is_lead:
                         print(f"[SKIP] E-mail ignorado: não atende aos critérios de assunto de Leads comercial.")
+                        # Marcar como lido para não re-processar e-mails normais
+                        mail.store(e_id, '+FLAGS', '\\Seen')
                         # Registrar Log de E-mail Ignorado no Banco
                         db_log = SessionLocal()
                         try:
@@ -163,7 +165,7 @@ def fetch_unread_emails():
                                 subcategory=ai_data.subcategory,
                                 client_type=ai_data.client_type,
                                 tags=ai_data.tags,
-                                status=models.LeadStatusEnum.leads_novos,
+                                status=models.LeadStatusEnum.distribuido if vendedor else models.LeadStatusEnum.novo,
                                 priority=ai_data.priority,
                                 urgency_level=ai_data.urgency_level,
                                 ai_summary=ai_data.ai_summary,
@@ -188,9 +190,11 @@ def fetch_unread_emails():
                                 message=f"Novo lead '{novo_lead.name}' ({novo_lead.email}) capturado com sucesso!"
                             )
                             db.add(log_entry)
-                            
                             db.commit()
                             print(f"[SUCCESS] Lead '{ai_data.name}' criado via IMAP com sucesso.")
+                            
+                            # Marcar e-mail como lido apenas após persistência e commit bem sucedidos no DB!
+                            mail.store(e_id, '+FLAGS', '\\Seen')
                             
                         except Exception as db_err:
                             logger.error(f"Erro ao salvar lead no banco: {db_err}")
@@ -205,6 +209,22 @@ def fetch_unread_emails():
                             db.rollback()
                         finally:
                             db.close()
+                    else:
+                        print(f"[ERROR] Falha de IA ao processar e-mail de '{sender}'. Marcar como lido para evitar loop.")
+                        mail.store(e_id, '+FLAGS', '\\Seen')
+                        db_log = SessionLocal()
+                        try:
+                            log_entry = models.SystemLog(
+                                log_type="ERROR",
+                                source="IMAP_READER",
+                                message=f"Falha de IA (Gemini) ao decodificar conteúdo do Lead. Remetente: '{sender}'. Assunto: '{subject}'."
+                            )
+                            db_log.add(log_entry)
+                            db_log.commit()
+                        except Exception as log_err:
+                            logger.error(f"Erro ao salvar log: {log_err}")
+                        finally:
+                            db_log.close()
                             
     except Exception as e:
         logger.error(f"Erro processando emails: {e}")
