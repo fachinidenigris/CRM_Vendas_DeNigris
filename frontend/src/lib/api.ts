@@ -1,4 +1,8 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'https://crm-vendas-denigris.onrender.com/api/v1';
+let baseApiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://crm-vendas-denigris.onrender.com/api/v1';
+if (baseApiUrl && !baseApiUrl.endsWith('/api/v1')) {
+  baseApiUrl = baseApiUrl.endsWith('/') ? `${baseApiUrl}api/v1` : `${baseApiUrl}/api/v1`;
+}
+const API_URL = baseApiUrl;
 
 export interface User {
   id: string;

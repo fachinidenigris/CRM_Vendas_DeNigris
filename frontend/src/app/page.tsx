@@ -329,7 +329,7 @@ export default function Home() {
                   required
                   value={newLeadForm.name}
                   onChange={(e) => setNewLeadForm({ ...newLeadForm, name: e.target.value })}
-                  placeholder="Ex: Fabiano Fachini"
+                  placeholder="Ex: Fabio Fachini"
                   className="w-full bg-background border border-border rounded p-2.5 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
                 />
               </div>

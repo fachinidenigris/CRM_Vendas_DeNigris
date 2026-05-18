@@ -44,7 +44,7 @@ export default function RootLayout({
             <div className="mt-auto pt-4 border-t border-border flex items-center justify-between">
               <div className="flex flex-col">
                 <span className="text-xs text-foreground/45">Diretoria</span>
-                <span className="text-sm font-medium text-foreground/85">Fabiano Fachini</span>
+                <span className="text-sm font-medium text-foreground/85">Fabio Fachini</span>
               </div>
               <div className="w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse" title="Servidor Ativo" />
             </div>
