@@ -129,7 +129,103 @@ export default function Home() {
       </header>
 
       <div className="grid gap-6 md:grid-cols-3">
-        {/* Coluna 1: Follow-ups Atrasados / Urgentes */}
+        {/* Coluna 1: Novos Leads */}
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2 text-green-500 font-semibold mb-4 border-b border-border pb-2">
+            <User size={20} />
+            <h3>Novos Leads ({newLeads.length})</h3>
+          </div>
+          
+          {newLeads.map((lead) => (
+            <div 
+              key={lead.id} 
+              onClick={() => handleOpenLead(lead)}
+              className="bg-card border border-border rounded-lg p-4 shadow-sm hover:border-green-500/50 transition-colors cursor-pointer"
+            >
+               <div className="flex justify-between items-start mb-2">
+                <span className="text-xs font-semibold px-2 py-1 bg-green-500/10 text-green-500 rounded-full">Entrada Inbox</span>
+                <span className="text-xs text-foreground/50 flex items-center">
+                  <Clock size={12} className="mr-1"/> {new Date(lead.created_at).toLocaleDateString('pt-BR')}
+                </span>
+              </div>
+              <h4 className="font-bold text-lg">{lead.name}</h4>
+              <p className="text-sm text-foreground/70 mb-3 flex items-center mt-1">Origem: {lead.source}</p>
+              
+              {lead.ai_summary && (
+                <div className="bg-background rounded p-2 text-sm text-foreground/80 mb-3 border border-border">
+                  <span className="font-semibold block mb-1">Resumo Inteligente IA:</span>
+                  {lead.ai_summary}
+                </div>
+              )}
+              
+              <div className="flex items-center justify-between border-t border-border pt-3 mt-2">
+                <span className="text-xs font-medium text-foreground/60">Ação Necessária: Responder e-mail</span>
+                <button className="flex items-center space-x-1 text-xs bg-foreground/10 hover:bg-foreground/20 px-2 py-1 rounded transition-colors">
+                  <span>Abrir Ficha</span>
+                </button>
+              </div>
+            </div>
+          ))}
+
+          {newLeads.length === 0 && (
+            <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
+              Excelente! Nenhum novo lead sem resposta pendente.
+            </div>
+          )}
+        </div>
+
+        {/* Coluna 2: Tarefas do Dia */}
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2 text-blue-500 font-semibold mb-4 border-b border-border pb-2">
+            <Calendar size={20} />
+            <h3>Tarefas de Hoje / Pendentes ({todayTasks.length})</h3>
+          </div>
+          
+          {todayTasks.map((task) => {
+            const lead = leads.find(l => l.id === task.lead_id);
+            return (
+              <div 
+                key={task.id} 
+                onClick={() => lead && handleOpenLead(lead)}
+                className="bg-card border border-border rounded-lg p-4 shadow-sm hover:border-blue-500/50 transition-colors cursor-pointer"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-semibold px-2 py-1 bg-blue-500/10 text-blue-500 rounded-full flex items-center">
+                    {task.task_type === 'ligacao' ? <Phone size={12} className="mr-1"/> : <FileText size={12} className="mr-1"/>}
+                    {task.task_type.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-foreground/50">
+                    {new Date(task.due_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </div>
+                <h4 className="font-bold text-lg">{task.title}</h4>
+                {lead && <p className="text-sm text-foreground/70 mb-2 flex items-center"><Briefcase size={14} className="mr-1"/> {lead.company || lead.name}</p>}
+                
+                <div className="text-sm text-foreground/80 mb-3 whitespace-pre-wrap">
+                  {task.description}
+                </div>
+                
+                <div className="flex items-center justify-between border-t border-border pt-3 mt-2">
+                  <span className="text-xs font-medium text-foreground/60">Responsável: Você</span>
+                  <button 
+                    onClick={(e) => handleCompleteTask(task.id, e)}
+                    className="flex items-center space-x-1 text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
+                  >
+                    <span>Concluir</span>
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+
+          {todayTasks.length === 0 && (
+            <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
+              Nenhuma tarefa pendente para hoje.
+            </div>
+          )}
+        </div>
+
+        {/* Coluna 3: Follow-ups Atrasados / Urgentes */}
         <div className="space-y-4">
           <div className="flex items-center space-x-2 text-red-500 font-semibold mb-4 border-b border-border pb-2">
             <AlertCircle size={20} />
@@ -202,102 +298,6 @@ export default function Home() {
           {urgentLeads.length === 0 && overdueTasks.length === 0 && (
             <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
               Tudo em dia! Sem atrasos na sua fila.
-            </div>
-          )}
-        </div>
-
-        {/* Coluna 2: Tarefas do Dia */}
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2 text-blue-500 font-semibold mb-4 border-b border-border pb-2">
-            <Calendar size={20} />
-            <h3>Tarefas de Hoje / Pendentes ({todayTasks.length})</h3>
-          </div>
-          
-          {todayTasks.map((task) => {
-            const lead = leads.find(l => l.id === task.lead_id);
-            return (
-              <div 
-                key={task.id} 
-                onClick={() => lead && handleOpenLead(lead)}
-                className="bg-card border border-border rounded-lg p-4 shadow-sm hover:border-blue-500/50 transition-colors cursor-pointer"
-              >
-                <div className="flex justify-between items-start mb-2">
-                  <span className="text-xs font-semibold px-2 py-1 bg-blue-500/10 text-blue-500 rounded-full flex items-center">
-                    {task.task_type === 'ligacao' ? <Phone size={12} className="mr-1"/> : <FileText size={12} className="mr-1"/>}
-                    {task.task_type.toUpperCase()}
-                  </span>
-                  <span className="text-xs text-foreground/50">
-                    {new Date(task.due_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                  </span>
-                </div>
-                <h4 className="font-bold text-lg">{task.title}</h4>
-                {lead && <p className="text-sm text-foreground/70 mb-2 flex items-center"><Briefcase size={14} className="mr-1"/> {lead.company || lead.name}</p>}
-                
-                <div className="text-sm text-foreground/80 mb-3 whitespace-pre-wrap">
-                  {task.description}
-                </div>
-                
-                <div className="flex items-center justify-between border-t border-border pt-3 mt-2">
-                  <span className="text-xs font-medium text-foreground/60">Responsável: Você</span>
-                  <button 
-                    onClick={(e) => handleCompleteTask(task.id, e)}
-                    className="flex items-center space-x-1 text-xs bg-blue-500 text-white px-3 py-1 rounded hover:bg-blue-600 transition-colors"
-                  >
-                    <span>Concluir</span>
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-
-          {todayTasks.length === 0 && (
-            <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
-              Nenhuma tarefa pendente para hoje.
-            </div>
-          )}
-        </div>
-
-        {/* Coluna 3: Novos Leads */}
-        <div className="space-y-4">
-          <div className="flex items-center space-x-2 text-green-500 font-semibold mb-4 border-b border-border pb-2">
-            <User size={20} />
-            <h3>Novos Leads ({newLeads.length})</h3>
-          </div>
-          
-          {newLeads.map((lead) => (
-            <div 
-              key={lead.id} 
-              onClick={() => handleOpenLead(lead)}
-              className="bg-card border border-border rounded-lg p-4 shadow-sm hover:border-green-500/50 transition-colors cursor-pointer"
-            >
-               <div className="flex justify-between items-start mb-2">
-                <span className="text-xs font-semibold px-2 py-1 bg-green-500/10 text-green-500 rounded-full">Entrada Inbox</span>
-                <span className="text-xs text-foreground/50 flex items-center">
-                  <Clock size={12} className="mr-1"/> {new Date(lead.created_at).toLocaleDateString('pt-BR')}
-                </span>
-              </div>
-              <h4 className="font-bold text-lg">{lead.name}</h4>
-              <p className="text-sm text-foreground/70 mb-3 flex items-center mt-1">Origem: {lead.source}</p>
-              
-              {lead.ai_summary && (
-                <div className="bg-background rounded p-2 text-sm text-foreground/80 mb-3 border border-border">
-                  <span className="font-semibold block mb-1">Resumo Inteligente IA:</span>
-                  {lead.ai_summary}
-                </div>
-              )}
-              
-              <div className="flex items-center justify-between border-t border-border pt-3 mt-2">
-                <span className="text-xs font-medium text-foreground/60">Ação Necessária: Responder e-mail</span>
-                <button className="flex items-center space-x-1 text-xs bg-foreground/10 hover:bg-foreground/20 px-2 py-1 rounded transition-colors">
-                  <span>Abrir Ficha</span>
-                </button>
-              </div>
-            </div>
-          ))}
-
-          {newLeads.length === 0 && (
-            <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
-              Excelente! Nenhum novo lead sem resposta pendente.
             </div>
           )}
         </div>

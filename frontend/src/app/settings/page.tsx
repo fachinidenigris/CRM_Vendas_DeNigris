@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { api, User, Team } from '@/lib/api';
-import { RefreshCw, Users, Shield, UserCheck, Plus, Settings } from 'lucide-react';
+import { RefreshCw, Users, Shield, UserCheck, Plus, Settings, Edit, Trash2 } from 'lucide-react';
 
 export default function SettingsPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -14,9 +14,23 @@ export default function SettingsPage() {
   const [newTeamName, setNewTeamName] = useState('');
   const [selectedManagerId, setSelectedManagerId] = useState('');
 
+  // Editar Equipe State
+  const [editingTeam, setEditingTeam] = useState<Team | null>(null);
+  const [editTeamName, setEditTeamName] = useState('');
+  const [editTeamManagerId, setEditTeamManagerId] = useState('');
+
   // Criar Usuário State
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [newUserForm, setNewUserForm] = useState({
+    name: '',
+    email: '',
+    role: 'vendedor' as 'admin' | 'gestor' | 'vendedor',
+    team_id: ''
+  });
+
+  // Editar Usuário State
+  const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [editUserForm, setEditUserForm] = useState({
     name: '',
     email: '',
     role: 'vendedor' as 'admin' | 'gestor' | 'vendedor',
@@ -38,6 +52,7 @@ export default function SettingsPage() {
     loadData();
   }, []);
 
+  // --- ACTIONS: TEAMS ---
   const handleCreateTeam = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newTeamName.trim()) return;
@@ -51,6 +66,37 @@ export default function SettingsPage() {
     loadData();
   };
 
+  const handleStartEditTeam = (team: Team) => {
+    setEditingTeam(team);
+    setEditTeamName(team.name);
+    setEditTeamManagerId(team.manager_id || '');
+  };
+
+  const handleUpdateTeam = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingTeam || !editTeamName.trim()) return;
+
+    const updated = await api.updateTeam(editingTeam.id, editTeamName, editTeamManagerId || null);
+    if (updated) {
+      setEditingTeam(null);
+      loadData();
+    } else {
+      alert("Falha ao atualizar equipe.");
+    }
+  };
+
+  const handleDeleteTeam = async (teamId: string) => {
+    if (!confirm("Aviso crítico: Excluir esta equipe desassociará todos os seus membros atuais. Deseja continuar?")) return;
+
+    const success = await api.deleteTeam(teamId);
+    if (success) {
+      loadData();
+    } else {
+      alert("Falha ao excluir equipe.");
+    }
+  };
+
+  // --- ACTIONS: USERS ---
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserForm.name.trim() || !newUserForm.email.trim()) return;
@@ -77,10 +123,45 @@ export default function SettingsPage() {
     }
   };
 
-  const handleUpdateUserTeam = async (userId: string, teamId: string) => {
-    const targetTeamId = teamId === 'none' ? null : teamId;
-    await api.updateUserTeam(userId, targetTeamId);
-    loadData();
+  const handleStartEditUser = (user: User) => {
+    setEditingUser(user);
+    setEditUserForm({
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      team_id: user.team_id || 'none'
+    });
+  };
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUser || !editUserForm.name.trim() || !editUserForm.email.trim()) return;
+
+    const payload = {
+      name: editUserForm.name,
+      email: editUserForm.email,
+      role: editUserForm.role,
+      team_id: editUserForm.team_id === 'none' || !editUserForm.team_id ? null : editUserForm.team_id
+    };
+
+    const result = await api.updateUser(editingUser.id, payload);
+    if (result) {
+      setEditingUser(null);
+      loadData();
+    } else {
+      alert("Falha ao editar profissional. Certifique-se de que o e-mail comercial seja exclusivo.");
+    }
+  };
+
+  const handleDeleteUser = async (userId: string) => {
+    if (!confirm("Tem certeza que deseja remover este profissional do CRM? Esta ação é irreversível.")) return;
+
+    const success = await api.deleteUser(userId);
+    if (success) {
+      loadData();
+    } else {
+      alert("Falha ao excluir profissional.");
+    }
   };
 
   // Helpers de Renderização
@@ -152,7 +233,7 @@ export default function SettingsPage() {
                     <th className="pb-3 pl-2">Nome / E-mail</th>
                     <th className="pb-3">Cargo</th>
                     <th className="pb-3">Equipe Vinculada</th>
-                    <th className="pb-3 pr-2 text-right">Alterar Equipe</th>
+                    <th className="pb-3 pr-2 text-right">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
@@ -169,20 +250,22 @@ export default function SettingsPage() {
                         {getTeamName(user.team_id)}
                       </td>
                       <td className="py-4 pr-2 text-right">
-                        {user.role === 'admin' ? (
-                          <span className="text-xs text-foreground/30 italic">Acesso Geral</span>
-                        ) : (
-                          <select 
-                            value={user.team_id || 'none'}
-                            onChange={(e) => handleUpdateUserTeam(user.id, e.target.value)}
-                            className="bg-background border border-border rounded p-1.5 text-xs focus:ring-1 focus:ring-primary outline-none"
+                        <div className="flex justify-end space-x-1.5">
+                          <button
+                            onClick={() => handleStartEditUser(user)}
+                            className="p-1.5 text-foreground/60 hover:text-primary hover:bg-foreground/5 rounded transition-colors"
+                            title="Editar Profissional"
                           >
-                            <option value="none">Nenhuma (Sem Equipe)</option>
-                            {teams.map((t) => (
-                              <option key={t.id} value={t.id}>{t.name}</option>
-                            ))}
-                          </select>
-                        )}
+                            <Edit size={14} />
+                          </button>
+                          <button
+                            onClick={() => handleDeleteUser(user.id)}
+                            className="p-1.5 text-foreground/60 hover:text-red-500 hover:bg-red-500/5 rounded transition-colors"
+                            title="Excluir Profissional"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -262,10 +345,25 @@ export default function SettingsPage() {
                 <div className="text-center py-6 text-foreground/40 text-xs italic">Nenhuma equipe comercial cadastrada.</div>
               ) : (
                 teams.map((team) => (
-                  <div key={team.id} className="border border-border bg-background p-3 rounded-lg hover:border-foreground/20 transition-all flex flex-col justify-between space-y-2">
+                  <div key={team.id} className="border border-border bg-background p-3.5 rounded-lg hover:border-foreground/20 transition-all flex flex-col justify-between space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-bold text-sm text-foreground/90">{team.name}</span>
-                      <span className="text-[10px] bg-primary/10 text-primary border border-primary/20 px-2 py-0.5 rounded-full font-bold">Ativa</span>
+                      <div className="flex items-center space-x-1">
+                        <button
+                          onClick={() => handleStartEditTeam(team)}
+                          className="p-1 text-foreground/60 hover:text-primary rounded hover:bg-foreground/5 transition-colors"
+                          title="Editar Equipe"
+                        >
+                          <Edit size={13} />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteTeam(team.id)}
+                          className="p-1 text-foreground/60 hover:text-red-500 rounded hover:bg-red-500/5 transition-colors"
+                          title="Excluir Equipe"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      </div>
                     </div>
                     <div className="flex items-center justify-between text-xs text-foreground/50 border-t border-border/30 pt-2">
                       <span>Liderança:</span>
@@ -356,6 +454,146 @@ export default function SettingsPage() {
                   className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-sm font-medium transition-colors"
                 >
                   Salvar Profissional
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* Modal de Edição de Profissional */}
+      {editingUser && (
+        <>
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setEditingUser(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[450px] max-w-[95vw] bg-card border border-border rounded-xl shadow-2xl p-6 z-50 flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="text-xl font-bold">Editar Profissional Comercial</h3>
+              <button onClick={() => setEditingUser(null)} className="text-foreground/40 hover:text-foreground text-sm p-1 rounded-full hover:bg-foreground/5">✕</button>
+            </div>
+            
+            <form onSubmit={handleUpdateUser} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-foreground/75 block mb-1">Nome Completo *</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editUserForm.name}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, name: e.target.value })}
+                  placeholder="Ex: Fabio Fachini"
+                  className="w-full bg-background border border-border rounded p-2.5 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground/75 block mb-1">E-mail Comercial *</label>
+                <input 
+                  type="email" 
+                  required
+                  value={editUserForm.email}
+                  onChange={(e) => setEditUserForm({ ...editUserForm, email: e.target.value })}
+                  placeholder="exemplo@denigris.com.br"
+                  className="w-full bg-background border border-border rounded p-2.5 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-xs font-semibold text-foreground/75 block mb-1">Cargo / Função *</label>
+                  <select 
+                    value={editUserForm.role}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, role: e.target.value as any })}
+                    className="w-full bg-background border border-border rounded p-2.5 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                  >
+                    <option value="vendedor">Vendedor</option>
+                    <option value="gestor">Gestor de Equipe</option>
+                    <option value="admin">Administrador / Diretor</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-foreground/75 block mb-1">Equipe Vinculada</label>
+                  <select 
+                    value={editUserForm.team_id}
+                    onChange={(e) => setEditUserForm({ ...editUserForm, team_id: e.target.value })}
+                    className="w-full bg-background border border-border rounded p-2.5 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                  >
+                    <option value="none">Nenhuma (Sem Equipe)</option>
+                    {teams.map((t) => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t border-border mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingUser(null)}
+                  className="px-4 py-2 bg-foreground/5 hover:bg-foreground/10 text-foreground rounded text-sm font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-sm font-medium transition-colors"
+                >
+                  Salvar Alterações
+                </button>
+              </div>
+            </form>
+          </div>
+        </>
+      )}
+
+      {/* Modal de Edição de Equipe */}
+      {editingTeam && (
+        <>
+          <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-40" onClick={() => setEditingTeam(null)} />
+          <div className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] max-w-[95vw] bg-card border border-border rounded-xl shadow-2xl p-6 z-50 flex flex-col space-y-4 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center border-b border-border pb-3">
+              <h3 className="text-xl font-bold">Editar Equipe Comercial</h3>
+              <button onClick={() => setEditingTeam(null)} className="text-foreground/40 hover:text-foreground text-sm p-1 rounded-full hover:bg-foreground/5">✕</button>
+            </div>
+            
+            <form onSubmit={handleUpdateTeam} className="space-y-4">
+              <div>
+                <label className="text-xs font-semibold text-foreground/75 block mb-1">Nome da Equipe *</label>
+                <input 
+                  type="text" 
+                  required
+                  value={editTeamName}
+                  onChange={(e) => setEditTeamName(e.target.value)}
+                  placeholder="Ex: Equipe Seminovos"
+                  className="w-full bg-background border border-border rounded p-2.5 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                />
+              </div>
+
+              <div>
+                <label className="text-xs font-semibold text-foreground/75 block mb-1">Gestor Responsável</label>
+                <select 
+                  value={editTeamManagerId}
+                  onChange={(e) => setEditTeamManagerId(e.target.value)}
+                  className="w-full bg-background border border-border rounded p-2.5 outline-none focus:ring-2 focus:ring-primary/50 text-sm"
+                >
+                  <option value="">Sem Gestor Atribuído</option>
+                  {potentialManagers.map((mgr) => (
+                    <option key={mgr.id} value={mgr.id}>{mgr.name} ({mgr.role})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="flex justify-end space-x-2 pt-4 border-t border-border mt-6">
+                <button 
+                  type="button" 
+                  onClick={() => setEditingTeam(null)}
+                  className="px-4 py-2 bg-foreground/5 hover:bg-foreground/10 text-foreground rounded text-sm font-medium transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit"
+                  className="px-4 py-2 bg-primary hover:bg-primary/90 text-primary-foreground rounded text-sm font-medium transition-colors"
+                >
+                  Salvar Alterações
                 </button>
               </div>
             </form>

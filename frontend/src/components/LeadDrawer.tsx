@@ -122,6 +122,33 @@ export function LeadDrawer({ isOpen, onClose, lead, onLeadUpdated }: LeadDrawerP
     }
   };
 
+  const handleSendToWhatsApp = () => {
+    if (!lead) return;
+    
+    const clientType = lead.client_type || 'Não definido';
+    const company = lead.company || 'Pessoa Física';
+    const cityRegion = lead.city_region || 'Não informada';
+    const product = lead.product_interest || 'Sem veículo de interesse';
+    const aiSummary = lead.ai_summary || 'Nenhum resumo gerado pela IA.';
+    const leadPhone = lead.phone || 'Sem telefone';
+    const leadEmail = lead.email || 'Sem e-mail';
+    
+    const text = `📋 *RESUMO EXECUTIVO DO LEAD* 📋\n` +
+                 `━━━━━━━━━━━━━━━━━━━━━\n` +
+                 `👤 *Cliente:* ${lead.name}\n` +
+                 `🏢 *Tipo:* ${clientType} (${company})\n` +
+                 `📞 *Contato:* ${leadPhone}\n` +
+                 `📧 *E-mail:* ${leadEmail}\n` +
+                 `📍 *Região:* ${cityRegion}\n` +
+                 `🚛 *Interesse:* ${product}\n\n` +
+                 `🤖 *Análise da IA:* ${aiSummary}\n` +
+                 `━━━━━━━━━━━━━━━━━━━━━\n` +
+                 `💬 _Gerado pelo CRM Vendas DeNigris_`;
+                 
+    const url = `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`;
+    window.open(url, '_blank');
+  };
+
   return (
     <>
       {/* Overlay escuro */}
@@ -154,6 +181,15 @@ export function LeadDrawer({ isOpen, onClose, lead, onLeadUpdated }: LeadDrawerP
             <p className="text-foreground/60 text-sm flex items-center mt-1">
               {lead.company || 'Pessoa Física'} • {lead.city_region || 'Região não informada'}
             </p>
+            <div className="flex items-center space-x-2 mt-3">
+              <button 
+                onClick={handleSendToWhatsApp}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] px-3 py-1.5 rounded-lg transition-colors flex items-center shadow-sm uppercase tracking-wider"
+              >
+                <Send size={11} className="mr-1.5" />
+                WhatsApp Vendedor
+              </button>
+            </div>
           </div>
           <button onClick={onClose} className="p-2 hover:bg-foreground/10 rounded-full transition-colors shrink-0">
             <X size={20} />

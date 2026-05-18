@@ -19,6 +19,12 @@ class UserResponse(UserBase):
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
 
+class UserUpdate(BaseModel):
+    email: Optional[str] = None
+    name: Optional[str] = None
+    role: Optional[RoleEnum] = None
+    team_id: Optional[UUID] = None
+
 class TeamBase(BaseModel):
     name: str
     manager_id: Optional[UUID] = None
@@ -30,6 +36,10 @@ class TeamResponse(TeamBase):
     id: UUID
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class TeamUpdate(BaseModel):
+    name: Optional[str] = None
+    manager_id: Optional[UUID] = None
 
 class LeadCreate(BaseModel):
     name: str

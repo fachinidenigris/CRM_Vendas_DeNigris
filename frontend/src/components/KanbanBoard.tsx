@@ -112,13 +112,6 @@ export function KanbanBoard() {
                   {colLeads.length} {colLeads.length === 1 ? 'lead' : 'leads'}
                 </span>
               </div>
-              <span className="bg-foreground/10 text-xs px-2.5 py-1 rounded-full font-bold">
-                {colLeads.reduce((acc, curr) => {
-                  const valStr = curr.negotiated_value || curr.value_range || '0';
-                  const numeric = parseFloat(valStr.replace(/\D/g, '')) || 0;
-                  return acc + numeric;
-                }, 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })}
-              </span>
             </div>
 
             {/* Área de Cards */}

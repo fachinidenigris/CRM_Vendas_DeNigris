@@ -152,13 +152,73 @@ export const api = {
       
       const res = await fetch(url.toString(), {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' }
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
       });
       if (!res.ok) throw new Error('Falha ao associar usuário à equipe');
       return await res.json();
     } catch (err) {
       console.error(err);
       return null;
+    }
+  },
+
+  updateUser: async (userId: string, userUpdate: Partial<Omit<User, 'id'>>): Promise<User | null> => {
+    try {
+      const res = await fetch(`${API_URL}/users/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userUpdate)
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || 'Falha ao atualizar profissional');
+      }
+      return await res.json();
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  },
+
+  deleteUser: async (userId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_URL}/users/${userId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Falha ao excluir profissional');
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  },
+
+  updateTeam: async (teamId: string, name: string, managerId?: string | null): Promise<Team | null> => {
+    try {
+      const res = await fetch(`${API_URL}/teams/${teamId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name, manager_id: managerId })
+      });
+      if (!res.ok) throw new Error('Falha ao atualizar equipe');
+      return await res.json();
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  },
+
+  deleteTeam: async (teamId: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_URL}/teams/${teamId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Falha ao excluir equipe');
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
     }
   },
 

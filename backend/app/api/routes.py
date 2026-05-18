@@ -196,13 +196,76 @@ def create_user(user_in: crm.UserCreate, db: Session = Depends(get_db)):
     return user
 
 @router.patch("/users/{user_id}", response_model=crm.UserResponse, tags=["Users"])
-def update_user_team(user_id: UUID, team_id: UUID = None, db: Session = Depends(get_db)):
-    """Associa um vendedor/gestor a uma equipe comercial."""
+def update_user(user_id: UUID, user_in: crm.UserUpdate, team_id: UUID = None, db: Session = Depends(get_db)):
+    """Atualiza informações do profissional comercial (aceita body ou query parameter team_id para retrocompatibilidade)."""
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    user.team_id = team_id
+        
+    update_data = user_in.model_dump(exclude_unset=True)
+    
+    # Se team_id for passado na query string (retrocompatibilidade)
+    if team_id is not None:
+        user.team_id = team_id
+        
+    # Validação de e-mail duplicado
+    if "email" in update_data and update_data["email"] != user.email:
+        existing = db.query(models.User).filter(models.User.email == update_data["email"]).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Este e-mail já está cadastrado no sistema.")
+            
+    for field, value in update_data.items():
+        setattr(user, field, value)
+        
     db.add(user)
     db.commit()
     db.refresh(user)
     return user
+
+@router.delete("/users/{user_id}", tags=["Users"])
+def delete_user(user_id: UUID, db: Session = Depends(get_db)):
+    """Exclui um profissional comercial."""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+        
+    # Desassociar de leads e tarefas para evitar erros de integridade
+    db.query(models.Lead).filter(models.Lead.assigned_to_id == user_id).update({models.Lead.assigned_to_id: None})
+    db.query(models.Task).filter(models.Task.assigned_to_id == user_id).update({models.Task.assigned_to_id: None})
+    
+    # Se ele for gerente de alguma equipe, remover ele de gerente
+    db.query(models.Team).filter(models.Team.manager_id == user_id).update({models.Team.manager_id: None})
+    
+    db.delete(user)
+    db.commit()
+    return {"message": "Profissional excluído com sucesso."}
+
+@router.patch("/teams/{team_id}", response_model=crm.TeamResponse, tags=["Teams"])
+def update_team(team_id: UUID, team_in: crm.TeamUpdate, db: Session = Depends(get_db)):
+    """Edita as informações de uma equipe comercial."""
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+        
+    update_data = team_in.model_dump(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(team, field, value)
+        
+    db.add(team)
+    db.commit()
+    db.refresh(team)
+    return team
+
+@router.delete("/teams/{team_id}", tags=["Teams"])
+def delete_team(team_id: UUID, db: Session = Depends(get_db)):
+    """Exclui uma equipe comercial e desassocia todos os membros dela."""
+    team = db.query(models.Team).filter(models.Team.id == team_id).first()
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+        
+    # Desassociar todos os vendedores que pertenciam a esta equipe
+    db.query(models.User).filter(models.User.team_id == team_id).update({models.User.team_id: None})
+    
+    db.delete(team)
+    db.commit()
+    return {"message": "Equipe comercial excluída com sucesso."}
