@@ -6,6 +6,7 @@ import datetime
 from app.db.database import get_db
 from app.db import models
 from app.schemas import crm
+from app.core import security
 
 router = APIRouter()
 
@@ -182,6 +183,20 @@ def get_users(db: Session = Depends(get_db)):
     """Lista todos os usuários comerciais cadastrados no CRM."""
     return db.query(models.User).order_by(models.User.name.asc()).all()
 
+@router.post("/login", response_model=crm.TokenResponse, tags=["Authentication"])
+def login(login_in: crm.UserLogin, db: Session = Depends(get_db)):
+    """Realiza a autenticação do profissional comercial e retorna o token JWT."""
+    user = db.query(models.User).filter(models.User.email == login_in.email).first()
+    if not user or not security.verify_password(login_in.password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="E-mail ou senha incorretos.")
+        
+    access_token = security.create_access_token(user.id)
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": user
+    }
+
 @router.post("/users", response_model=crm.UserResponse, tags=["Users"], status_code=status.HTTP_201_CREATED)
 def create_user(user_in: crm.UserCreate, db: Session = Depends(get_db)):
     """Cadastra um novo profissional comercial (vendedor, gestor ou admin)."""
@@ -189,7 +204,12 @@ def create_user(user_in: crm.UserCreate, db: Session = Depends(get_db)):
     if existing:
         raise HTTPException(status_code=400, detail="Este e-mail já está cadastrado no sistema.")
     
-    user = models.User(**user_in.model_dump())
+    user_data = user_in.model_dump()
+    password = user_data.pop("password", None) or "denigris123"
+    
+    user = models.User(**user_data)
+    user.password_hash = security.hash_password(password)
+    
     db.add(user)
     db.commit()
     db.refresh(user)
@@ -213,6 +233,10 @@ def update_user(user_id: UUID, user_in: crm.UserUpdate, team_id: UUID = None, db
         existing = db.query(models.User).filter(models.User.email == update_data["email"]).first()
         if existing:
             raise HTTPException(status_code=400, detail="Este e-mail já está cadastrado no sistema.")
+            
+    password = update_data.pop("password", None)
+    if password:
+        user.password_hash = security.hash_password(password)
             
     for field, value in update_data.items():
         setattr(user, field, value)

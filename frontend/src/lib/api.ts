@@ -376,6 +376,30 @@ export const api = {
       localStorage.setItem('currentUser', JSON.stringify(user));
     } else {
       localStorage.removeItem('currentUser');
+      localStorage.removeItem('crm_access_token');
+    }
+  },
+
+  login: async (email: string, password: string): Promise<User | null> => {
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password })
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || 'E-mail ou senha incorretos.');
+      }
+      const data = await res.json();
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('crm_access_token', data.access_token);
+        localStorage.setItem('currentUser', JSON.stringify(data.user));
+      }
+      return data.user;
+    } catch (err: any) {
+      console.error(err);
+      throw err;
     }
   }
 };

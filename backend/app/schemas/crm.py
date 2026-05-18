@@ -11,7 +11,7 @@ class UserBase(BaseModel):
     is_paused: Optional[bool] = False
 
 class UserCreate(UserBase):
-    pass
+    password: Optional[str] = None
 
 class UserResponse(UserBase):
     id: UUID
@@ -27,6 +27,16 @@ class UserUpdate(BaseModel):
     role: Optional[RoleEnum] = None
     team_id: Optional[UUID] = None
     is_paused: Optional[bool] = None
+    password: Optional[str] = None
+
+class UserLogin(BaseModel):
+    email: str
+    password: str
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str
+    user: UserResponse
 
 class TeamBase(BaseModel):
     name: str

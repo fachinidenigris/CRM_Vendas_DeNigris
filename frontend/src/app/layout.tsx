@@ -4,7 +4,7 @@ import './globals.css';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Terminal, Kanban, Calendar, Shield, User, RefreshCw, UserCheck } from 'lucide-react';
+import { Users, Terminal, Kanban, Calendar, Shield, User, RefreshCw, UserCheck, Lock, Mail, Key, LogOut } from 'lucide-react';
 import { api, User as UserType } from '@/lib/api';
 
 export default function RootLayout({
@@ -17,17 +17,22 @@ export default function RootLayout({
   const [activeUser, setActiveUser] = useState<UserType | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // Carregar os usuários do backend
-  const loadUsersAndActiveSession = async () => {
-    try {
-      const fetchedUsers = await api.getUsers();
-      setUsers(fetchedUsers);
+  // Estados do formulário de Login Real
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [loginLoading, setLoginLoading] = useState(false);
+  const [loginError, setLoginError] = useState('');
 
-      // Tentar obter usuário ativo da sessão local
+  // Carregar os usuários do backend e validar a sessão atual
+  const loadSession = async () => {
+    try {
       const savedUser = api.getCurrentUser();
       
-      if (savedUser && fetchedUsers.some(u => u.id === savedUser.id)) {
-        // Garantir que os dados do usuário salvo estejam atualizados (por exemplo, is_paused)
+      if (savedUser) {
+        // Se houver usuário na sessão, buscamos a lista de usuários atualizada
+        const fetchedUsers = await api.getUsers();
+        setUsers(fetchedUsers);
+        
         const updatedSavedUser = fetchedUsers.find(u => u.id === savedUser.id);
         if (updatedSavedUser) {
           setActiveUser(updatedSavedUser);
@@ -35,11 +40,9 @@ export default function RootLayout({
         } else {
           setActiveUser(savedUser);
         }
-      } else if (fetchedUsers.length > 0) {
-        // Default: Selecionar o primeiro admin ou o primeiro vendedor da lista
-        const firstAdmin = fetchedUsers.find(u => u.role === 'admin') || fetchedUsers[0];
-        setActiveUser(firstAdmin);
-        api.setCurrentUser(firstAdmin);
+      } else {
+        // Se não houver sessão ativa, forçamos o estado nulo para exibir a tela de login
+        setActiveUser(null);
       }
     } catch (err) {
       console.error("Falha ao carregar sessão comercial:", err);
@@ -49,8 +52,39 @@ export default function RootLayout({
   };
 
   useEffect(() => {
-    loadUsersAndActiveSession();
+    loadSession();
   }, []);
+
+  const handleLoginSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      setLoginError('Por favor, preencha todos os campos.');
+      return;
+    }
+
+    setLoginLoading(true);
+    setLoginError('');
+
+    try {
+      const loggedUser = await api.login(loginEmail.trim(), loginPassword.trim());
+      if (loggedUser) {
+        setActiveUser(loggedUser);
+        // Após logar com sucesso, carrega a lista de usuários (para o simulador administrativo)
+        const fetchedUsers = await api.getUsers();
+        setUsers(fetchedUsers);
+      }
+    } catch (err: any) {
+      setLoginError(err.message || 'Erro ao realizar login. Verifique suas credenciais.');
+    } finally {
+      setLoginLoading(false);
+    }
+  };
+
+  const handleLogout = () => {
+    api.setCurrentUser(null);
+    setActiveUser(null);
+    window.location.reload();
+  };
 
   const handleSwitchUser = (userId: string) => {
     const selected = users.find(u => u.id === userId);
@@ -62,11 +96,142 @@ export default function RootLayout({
     }
   };
 
-  // Regras de Visualização baseadas em Perfil (Acesso de Acesso)
+  // Regras de Visualização baseadas em Perfil (Acesso de Segurança)
   const isVendedor = activeUser?.role === 'vendedor';
   const isGestor = activeUser?.role === 'gestor';
   const isAdmin = activeUser?.role === 'admin';
 
+  // Se o sistema estiver carregando a sessão inicial
+  if (loading) {
+    return (
+      <html lang="pt-BR" className="dark">
+        <body className="bg-background text-foreground antialiased flex flex-col justify-center items-center h-screen space-y-4">
+          <RefreshCw className="animate-spin text-primary" size={36} />
+          <span className="text-sm font-semibold tracking-wide text-foreground/60 font-mono">Autenticando portal comercial...</span>
+        </body>
+      </html>
+    );
+  }
+
+  // SE NÃO HOUVER SESSÃO ATIVA -> EXIBE A TELA DE LOGIN REAL COM BRANDING LUXUOSO
+  if (!activeUser) {
+    return (
+      <html lang="pt-BR" className="dark">
+        <body className="bg-[#040914] text-foreground antialiased flex items-center justify-center min-h-screen p-4 overflow-hidden relative">
+          
+          {/* Fundo Decorativo Premium (Branding De Nigris & Mercedes-Benz) */}
+          <div className="absolute top-1/4 left-1/4 w-[35rem] h-[35rem] bg-primary/10 rounded-full blur-[120px] -z-10 pointer-events-none" />
+          <div className="absolute bottom-1/4 right-1/4 w-[25rem] h-[25rem] bg-indigo-500/5 rounded-full blur-[100px] -z-10 pointer-events-none" />
+
+          <div className="w-full max-w-md bg-card/45 border border-border/40 backdrop-blur-xl p-8 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.5)] space-y-8 relative">
+            
+            {/* Logos Corporativos Premium (SVG Inline de Alta Fidelidade) */}
+            <div className="flex justify-center items-center space-x-6 pb-2">
+              {/* Logo De Nigris (Recriado com fidelidade absoluta de vetor e gradiente de luxo) */}
+              <div className="flex flex-col items-center">
+                <svg viewBox="0 0 200 200" className="w-14 h-14 drop-shadow-[0_4px_12px_rgba(46,74,158,0.25)]" fill="none">
+                  <rect width="200" height="200" rx="48" fill="url(#denigrisGrad)" />
+                  <path d="M55 50 H95 C130 50 150 70 150 100 C150 130 130 150 95 150 H55 V50 Z" stroke="white" strokeWidth="14" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M55 80 H80 V120 H55 V80 Z" fill="#2E4A9E" rx="8" />
+                  <defs>
+                    <linearGradient id="denigrisGrad" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#0B1C3F"/>
+                      <stop stopColor="#070E1C"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <span className="text-[9px] uppercase font-bold text-foreground/45 tracking-widest mt-2">De Nigris</span>
+              </div>
+
+              {/* Divisor Metálico */}
+              <div className="h-10 w-px bg-border/45" />
+
+              {/* Logo Mercedes-Benz (Estrela de Prata 3D Metálica) */}
+              <div className="flex flex-col items-center">
+                <svg viewBox="0 0 512 512" className="w-14 h-14 text-slate-300 drop-shadow-[0_4px_15px_rgba(255,255,255,0.15)]" fill="currentColor">
+                  <circle cx="256" cy="256" r="240" fill="none" stroke="currentColor" strokeWidth="12"/>
+                  <path d="M256 46 L256 220 L105 307 L256 256 L407 307 L256 220 Z" />
+                  <path d="M256 46 L256 220 L407 307 L256 256 L105 307 L256 220 Z" fill="rgba(255,255,255,0.25)"/>
+                </svg>
+                <span className="text-[9px] uppercase font-bold text-foreground/45 tracking-widest mt-2">Mercedes-Benz</span>
+              </div>
+            </div>
+
+            {/* Cabeçalho */}
+            <div className="text-center space-y-1.5">
+              <h2 className="text-2xl font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-foreground/60 bg-clip-text">Portal de Leads De Nigris</h2>
+              <p className="text-xs text-foreground/60 leading-relaxed max-w-[280px] mx-auto">Insira seu e-mail e senha comercial cadastrados para acessar o console.</p>
+            </div>
+
+            {/* Formulário de Login */}
+            <form onSubmit={handleLoginSubmit} className="space-y-4">
+              {loginError && (
+                <div className="bg-red-500/10 border border-red-500/20 text-red-500 text-xs p-3 rounded-lg flex items-center space-x-2 font-medium">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-500 shrink-0" />
+                  <p>{loginError}</p>
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label className="text-[10px] uppercase font-bold text-foreground/50 tracking-wider pl-1 flex items-center">
+                  <Mail className="inline mr-1" size={10} /> E-mail Comercial
+                </label>
+                <input 
+                  type="email" 
+                  value={loginEmail}
+                  onChange={(e) => setLoginEmail(e.target.value)}
+                  placeholder="exemplo@denigris.com.br"
+                  required
+                  className="w-full bg-[#080E1C] border border-border/40 focus:border-primary/60 rounded-xl px-4.5 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center pl-1">
+                  <label className="text-[10px] uppercase font-bold text-foreground/50 tracking-wider flex items-center">
+                    <Key className="inline mr-1" size={10} /> Senha de Acesso
+                  </label>
+                  <span className="text-[10px] text-foreground/35 font-medium hover:text-primary transition-colors cursor-help" title="A senha padrão inicial para usuários novos/semeados é: denigris123">
+                    Esqueceu a senha?
+                  </span>
+                </div>
+                <input 
+                  type="password" 
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="••••••••••••"
+                  required
+                  className="w-full bg-[#080E1C] border border-border/40 focus:border-primary/60 rounded-xl px-4.5 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all"
+                />
+              </div>
+
+              <button 
+                type="submit"
+                disabled={loginLoading}
+                className="w-full bg-primary text-primary-foreground font-semibold text-sm py-3 rounded-xl hover:bg-primary/95 transition-all shadow-lg shadow-primary/15 flex justify-center items-center cursor-pointer border border-primary-foreground/5"
+              >
+                {loginLoading ? (
+                  <RefreshCw className="animate-spin mr-2" size={16} />
+                ) : (
+                  <Lock className="mr-2" size={15} />
+                )}
+                {loginLoading ? 'Autenticando...' : 'Entrar no Sistema'}
+              </button>
+            </form>
+
+            {/* Rodapé Informativo */}
+            <div className="text-center pt-2">
+              <span className="text-[10px] text-foreground/30 font-medium">
+                © {new Date().getFullYear()} Grupo De Nigris Ltda. Todos os direitos reservados.
+              </span>
+            </div>
+          </div>
+        </body>
+      </html>
+    );
+  }
+
+  // SE ESTIVER AUTENTICADO -> CARREGA A ÁREA INTERNA DO CRM
   return (
     <html lang="pt-BR" className="dark">
       <body className="bg-background text-foreground antialiased">
@@ -75,87 +240,98 @@ export default function RootLayout({
           {/* Menu Lateral Fixo */}
           <aside className="w-64 border-r border-border bg-card flex flex-col p-4 shrink-0 justify-between select-none">
             <div className="space-y-6">
-              <div className="flex items-center space-x-2.5 px-3 py-1">
-                <div className="w-7 h-7 bg-primary rounded-lg flex items-center justify-center font-bold text-primary-foreground shadow">DN</div>
-                <h1 className="text-lg font-bold tracking-tight bg-gradient-to-r from-foreground via-foreground/90 to-foreground/60 bg-clip-text">De Nigris CRM</h1>
+              
+              {/* Branding da Empresa no Topo */}
+              <div className="flex items-center space-x-3 px-3 py-1">
+                {/* Ícone de D e N em SVG Premium */}
+                <svg viewBox="0 0 200 200" className="w-8 h-8 rounded-lg shadow" fill="none">
+                  <rect width="200" height="200" rx="48" fill="url(#denigrisGradSmall)" />
+                  <path d="M55 50 H95 C130 50 150 70 150 100 C150 130 130 150 95 150 H55 V50 Z" stroke="white" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round"/>
+                  <path d="M55 80 H80 V120 H55 V80 Z" fill="#2E4A9E" rx="8" />
+                  <defs>
+                    <linearGradient id="denigrisGradSmall" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+                      <stop stopColor="#0B1C3F"/>
+                      <stop stopColor="#070E1C"/>
+                    </linearGradient>
+                  </defs>
+                </svg>
+                <div className="flex flex-col">
+                  <h1 className="text-sm font-bold tracking-tight leading-none text-foreground">De Nigris CRM</h1>
+                  <span className="text-[9px] uppercase font-bold tracking-widest text-foreground/45 mt-0.5">Mercedes-Benz</span>
+                </div>
               </div>
 
-              {loading ? (
-                <div className="flex justify-center items-center py-8 text-foreground/40 text-xs">
-                  <RefreshCw className="animate-spin mr-2" size={14} /> Carregando permissões...
-                </div>
-              ) : (
-                <nav className="space-y-1">
-                  {/* Link: Agenda / Hoje (Disponível para todos os perfis) */}
+              {/* Navegação por Perfil */}
+              <nav className="space-y-1">
+                {/* Link: Agenda / Hoje (Disponível para todos os perfis) */}
+                <Link 
+                  href="/" 
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    pathname === '/' 
+                      ? 'bg-primary text-primary-foreground shadow-sm' 
+                      : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
+                  }`}
+                >
+                  <Calendar size={18} />
+                  <span>Agenda / Hoje</span>
+                </Link>
+
+                {/* Link: Kanban (Disponível para todos os perfis) */}
+                <Link 
+                  href="/kanban" 
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    pathname === '/kanban' 
+                      ? 'bg-primary text-primary-foreground shadow-sm' 
+                      : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
+                  }`}
+                >
+                  <Kanban size={18} />
+                  <span>Kanban</span>
+                </Link>
+
+                {/* Link: Equipes & Usuários (Indisponível para Vendedor) */}
+                {(isAdmin || isGestor) && (
                   <Link 
-                    href="/" 
+                    href="/settings" 
                     className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      pathname === '/' 
+                      pathname === '/settings' 
                         ? 'bg-primary text-primary-foreground shadow-sm' 
                         : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                     }`}
                   >
-                    <Calendar size={18} />
-                    <span>Agenda / Hoje</span>
+                    <Users size={18} />
+                    <span>Equipes & Usuários</span>
                   </Link>
+                )}
 
-                  {/* Link: Kanban (Disponível para todos os perfis) */}
+                {/* Link: Logs Comerciais (Apenas Admin/Diretoria) */}
+                {isAdmin && (
                   <Link 
-                    href="/kanban" 
+                    href="/logs" 
                     className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                      pathname === '/kanban' 
+                      pathname === '/logs' 
                         ? 'bg-primary text-primary-foreground shadow-sm' 
                         : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                     }`}
                   >
-                    <Kanban size={18} />
-                    <span>Kanban</span>
+                    <Terminal size={18} />
+                    <span>Logs Comerciais</span>
                   </Link>
-
-                  {/* Link: Equipes & Usuários (Indisponível para Vendedor) */}
-                  {(isAdmin || isGestor) && (
-                    <Link 
-                      href="/settings" 
-                      className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                        pathname === '/settings' 
-                          ? 'bg-primary text-primary-foreground shadow-sm' 
-                          : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
-                      }`}
-                    >
-                      <Users size={18} />
-                      <span>Equipes & Usuários</span>
-                    </Link>
-                  )}
-
-                  {/* Link: Logs Comerciais (Apenas Admin/Diretoria) */}
-                  {isAdmin && (
-                    <Link 
-                      href="/logs" 
-                      className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
-                        pathname === '/logs' 
-                          ? 'bg-primary text-primary-foreground shadow-sm' 
-                          : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
-                      }`}
-                    >
-                      <Terminal size={18} />
-                      <span>Logs Comerciais</span>
-                    </Link>
-                  )}
-                </nav>
-              )}
+                )}
+              </nav>
             </div>
 
-            {/* Seletor Dinâmico de Usuários (Login Simulado) */}
-            <div className="border-t border-border/60 pt-4 mt-auto space-y-3">
-              <div className="space-y-1">
-                <label className="text-[10px] uppercase font-bold text-foreground/45 tracking-wider block pl-1">
-                  Usuário Ativo (Sessão)
-                </label>
-                {loading ? (
-                  <div className="h-9 w-full bg-foreground/5 rounded animate-pulse" />
-                ) : (
+            {/* Painel do Usuário Logado & Simulador Administrativo */}
+            <div className="border-t border-border/60 pt-4 mt-auto space-y-4">
+              
+              {/* Simulador de Perfis (Disponível apenas para Administradores da Diretoria) */}
+              {isAdmin && users.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-[10px] uppercase font-bold text-foreground/45 tracking-wider block pl-1">
+                    Simulador de Perfis (Auditoria)
+                  </label>
                   <select
-                    value={activeUser?.id || ''}
+                    value={activeUser.id}
                     onChange={(e) => handleSwitchUser(e.target.value)}
                     className="w-full bg-background/50 border border-border rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-primary outline-none cursor-pointer hover:bg-background transition-colors text-foreground/85"
                   >
@@ -165,44 +341,58 @@ export default function RootLayout({
                       </option>
                     ))}
                   </select>
-                )}
-              </div>
+                </div>
+              )}
 
-              {activeUser && (
-                <div className="flex items-center justify-between pl-1">
-                  <div className="flex flex-col">
-                    <span className="text-[10px] text-foreground/40 font-bold uppercase tracking-wider">
-                      Perfil de Acesso
-                    </span>
-                    <span className="text-xs font-semibold text-primary flex items-center mt-0.5">
-                      {activeUser.role === 'admin' && <Shield className="inline mr-1" size={12} />}
-                      {activeUser.role === 'gestor' && <UserCheck className="inline mr-1" size={12} />}
-                      {activeUser.role === 'vendedor' && <User className="inline mr-1" size={12} />}
-                      {activeUser.role === 'admin' ? 'Acesso Geral' : activeUser.role === 'gestor' ? 'Gestão' : 'Vendedor'}
-                    </span>
-                  </div>
+              {/* Informações da Sessão Ativa */}
+              <div className="flex items-center justify-between pl-1 bg-foreground/[0.02] p-2 rounded-lg border border-border/40">
+                <div className="flex flex-col">
+                  <span className="text-[10px] text-foreground/40 font-bold uppercase tracking-wider leading-none">
+                    Perfil
+                  </span>
+                  <span className="text-xs font-semibold text-primary flex items-center mt-1">
+                    {activeUser.role === 'admin' && <Shield className="inline mr-1 text-slate-400" size={11} />}
+                    {activeUser.role === 'gestor' && <UserCheck className="inline mr-1" size={11} />}
+                    {activeUser.role === 'vendedor' && <User className="inline mr-1" size={11} />}
+                    {activeUser.role === 'admin' ? 'Diretor' : activeUser.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                  </span>
+                  <span className="text-[10px] text-foreground/60 mt-0.5 max-w-[120px] truncate font-medium">
+                    {activeUser.name}
+                  </span>
+                </div>
+
+                <div className="flex items-center space-x-2">
                   <div 
-                    className={`w-2.5 h-2.5 rounded-full ${
+                    className={`w-2 h-2 rounded-full ${
                       activeUser.role === 'vendedor' && activeUser.is_paused 
                         ? 'bg-amber-500 animate-pulse' 
                         : 'bg-emerald-500 animate-pulse'
                     }`} 
                     title={
                       activeUser.role === 'vendedor' && activeUser.is_paused 
-                        ? "Rodízio Pausado" 
-                        : "Servidor Ativo"
+                        ? "Rodízio de Leads Pausado" 
+                        : "Vendedor no Rodízio de Leads"
                     } 
                   />
+                  <button
+                    onClick={handleLogout}
+                    className="text-foreground/45 hover:text-red-400 p-1.5 rounded-md hover:bg-red-500/10 transition-all"
+                    title="Encerrar Sessão"
+                  >
+                    <LogOut size={14} />
+                  </button>
                 </div>
-              )}
+              </div>
+
             </div>
 
           </aside>
 
-          {/* Área Principal */}
-          <main className="flex-1 overflow-y-auto bg-background p-6">
+          {/* Área Principal de Conteúdo das Páginas */}
+          <main className="flex-1 overflow-y-auto p-6 bg-background relative">
             {children}
           </main>
+
         </div>
       </body>
     </html>
