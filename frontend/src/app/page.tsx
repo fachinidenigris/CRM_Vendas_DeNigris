@@ -28,26 +28,33 @@ export default function Home() {
     ai_summary: 'Criado manualmente pelo painel comercial.'
   });
 
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
   const fetchData = async () => {
     setLoading(true);
-    const [fetchedLeads, fetchedTasks] = await Promise.all([
-      api.getLeads(),
-      api.getTasks()
-    ]);
-    
-    const activeUser = api.getCurrentUser();
-    let filteredLeads = fetchedLeads;
-    let filteredTasks = fetchedTasks;
-    
-    if (activeUser && activeUser.role === 'vendedor') {
-      filteredLeads = fetchedLeads.filter(l => l.assigned_to_id === activeUser.id);
-      const myLeadIds = new Set(filteredLeads.map(l => l.id));
-      filteredTasks = fetchedTasks.filter(t => myLeadIds.has(t.lead_id));
+    try {
+      const [fetchedLeads, fetchedTasks] = await Promise.all([
+        api.getLeads(),
+        api.getTasks()
+      ]);
+      
+      const activeUser = api.getCurrentUser();
+      let filteredLeads = fetchedLeads;
+      let filteredTasks = fetchedTasks;
+      
+      if (activeUser && activeUser.role === 'vendedor') {
+        filteredLeads = fetchedLeads.filter(l => l.assigned_to_id === activeUser.id);
+        const myLeadIds = new Set(filteredLeads.map(l => l.id));
+        filteredTasks = fetchedTasks.filter(t => myLeadIds.has(t.lead_id));
+      }
+      
+      setLeads(filteredLeads);
+      setTasks(filteredTasks);
+    } catch (err) {
+      console.error('[ERRO] Falha ao buscar dados da Agenda:', err);
+    } finally {
+      setLoading(false);
     }
-    
-    setLeads(filteredLeads);
-    setTasks(filteredTasks);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -105,8 +112,7 @@ export default function Home() {
     );
   }
 
-  // 1. Controle de Data Selecionada para a Agenda / Calendário
-  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  // 1. Controle de Data Selecionada para a Agenda / Calendário (declarado no topo)
 
   // Função utilitária para gerar a faixa de 7 dias centralizada em hoje
   const getWeekDays = () => {

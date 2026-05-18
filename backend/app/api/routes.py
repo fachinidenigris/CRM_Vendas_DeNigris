@@ -20,7 +20,7 @@ def get_leads(
 ):
     """Busca todos os leads filtrados de forma segura a nível comercial."""
     # Auto-Arquivamento (Zero Cost - sem CRON)
-    threshold_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
+    threshold_date = datetime.datetime.utcnow() - datetime.timedelta(days=7)
     
     leads_to_archive = db.query(models.Lead).filter(
         models.Lead.status.in_([models.LeadStatusEnum.venda_realizada, models.LeadStatusEnum.venda_perdida]),
