@@ -83,6 +83,7 @@ export interface Lead {
   sale_product?: string;
   sale_model?: string;
   is_archived?: boolean;
+  priority?: 'baixa' | 'media' | 'alta' | 'critica' | string;
   
   assigned_to_id?: string | null;
 }
