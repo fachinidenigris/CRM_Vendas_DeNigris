@@ -447,13 +447,13 @@ export default function RootLayout({
             <div className="border-t border-border/60 pt-4 mt-auto space-y-4">
               
               {/* Simulador de Perfis (Disponível apenas para Administradores da Diretoria) */}
-              {isAdmin && users.length > 0 && (
+              {isAdmin && users.length > 0 && activeUser && (
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold text-foreground/45 tracking-wider block pl-1">
                     Simulador de Perfis (Auditoria)
                   </label>
                   <select
-                    value={activeUser.id}
+                    value={activeUser.id || ''}
                     onChange={(e) => handleSwitchUser(e.target.value)}
                     className="w-full bg-background/50 border border-border rounded-lg p-2 text-xs font-semibold focus:ring-1 focus:ring-primary outline-none cursor-pointer hover:bg-background transition-colors text-foreground/85"
                   >
@@ -473,28 +473,28 @@ export default function RootLayout({
                     Perfil
                   </span>
                   <span className="text-xs font-semibold text-primary flex items-center mt-1">
-                    {activeUser.role === 'admin' && <Shield className="inline mr-1 text-slate-400" size={11} />}
-                    {activeUser.role === 'gestor' && <UserCheck className="inline mr-1" size={11} />}
-                    {activeUser.role === 'vendedor' && <User className="inline mr-1" size={11} />}
-                    {activeUser.role === 'admin' ? 'Diretor' : activeUser.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                    {activeUser?.role === 'admin' && <Shield className="inline mr-1 text-slate-400" size={11} />}
+                    {activeUser?.role === 'gestor' && <UserCheck className="inline mr-1" size={11} />}
+                    {activeUser?.role === 'vendedor' && <User className="inline mr-1" size={11} />}
+                    {activeUser?.role === 'admin' ? 'Diretor' : activeUser?.role === 'gestor' ? 'Gestor' : 'Vendedor'}
                   </span>
                   <span className="text-[10px] text-foreground/60 mt-0.5 max-w-[120px] truncate font-medium">
-                    {activeUser.name}
+                    {activeUser?.name}
                   </span>
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  {activeUser.role === 'vendedor' ? (
+                  {activeUser?.role === 'vendedor' ? (
                     <button
                       onClick={handleToggleMyPause}
                       className={`text-[9px] px-2 py-0.5 rounded-full font-bold border transition-colors cursor-pointer ${
-                        activeUser.is_paused 
+                        activeUser?.is_paused 
                           ? 'bg-amber-500/10 text-amber-500 border-amber-500/25 hover:bg-amber-500/20' 
                           : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/20'
                       }`}
-                      title={activeUser.is_paused ? "Você está ausente. Clique para voltar a receber leads." : "Você está ativo no rodízio. Clique para pausar."}
+                      title={activeUser?.is_paused ? "Você está ausente. Clique para voltar a receber leads." : "Você está ativo no rodízio. Clique para pausar."}
                     >
-                      {activeUser.is_paused ? '⏸️ Pausado' : '▶️ Ativo'}
+                      {activeUser?.is_paused ? '⏸️ Pausado' : '▶️ Ativo'}
                     </button>
                   ) : (
                     <div 

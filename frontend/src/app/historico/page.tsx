@@ -60,7 +60,8 @@ export default function HistoricoPage() {
   }
 
   // Helper for Date
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString?: string | null) => {
+    if (!dateString) return '---';
     return new Date(dateString).toLocaleDateString('pt-BR');
   }
 
