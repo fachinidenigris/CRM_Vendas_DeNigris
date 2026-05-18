@@ -14,6 +14,34 @@ Base.metadata.create_all(bind=engine)
 from app.db import models
 from app.db.database import SessionLocal
 from app.core import security
+from sqlalchemy import text, inspect
+
+def run_migrations():
+    db = SessionLocal()
+    try:
+        inspector = inspect(engine)
+        columns = [c["name"] for c in inspector.get_columns("users")]
+        
+        if "password_hash" not in columns:
+            print("[MIGRATION] Coluna 'password_hash' não encontrada na tabela 'users'. Adicionando...")
+            db.execute(text("ALTER TABLE users ADD COLUMN password_hash VARCHAR"))
+            db.commit()
+            print("[MIGRATION] Coluna 'password_hash' adicionada com sucesso.")
+            
+        if "is_paused" not in columns:
+            print("[MIGRATION] Coluna 'is_paused' não encontrada na tabela 'users'. Adicionando...")
+            db.execute(text("ALTER TABLE users ADD COLUMN is_paused BOOLEAN DEFAULT FALSE"))
+            db.commit()
+            db.execute(text("UPDATE users SET is_paused = FALSE WHERE is_paused IS NULL"))
+            db.commit()
+            print("[MIGRATION] Coluna 'is_paused' adicionada com sucesso.")
+    except Exception as e:
+        print(f"[MIGRATION] Erro ao executar migrações automáticas: {e}")
+        db.rollback()
+    finally:
+        db.close()
+
+run_migrations()
 
 def seed_db():
     db = SessionLocal()

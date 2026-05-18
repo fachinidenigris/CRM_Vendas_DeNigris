@@ -146,12 +146,11 @@ export default function RootLayout({
               {/* Divisor Metálico */}
               <div className="h-10 w-px bg-border/45" />
 
-              {/* Logo Mercedes-Benz (Estrela de Prata 3D Metálica) */}
+              {/* Logo Mercedes-Benz (Estrela de 3 Pontas 2D Plana Branca) */}
               <div className="flex flex-col items-center">
-                <svg viewBox="0 0 512 512" className="w-14 h-14 text-slate-300 drop-shadow-[0_4px_15px_rgba(255,255,255,0.15)]" fill="currentColor">
-                  <circle cx="256" cy="256" r="240" fill="none" stroke="currentColor" strokeWidth="12"/>
-                  <path d="M256 46 L256 220 L105 307 L256 256 L407 307 L256 220 Z" />
-                  <path d="M256 46 L256 220 L407 307 L256 256 L105 307 L256 220 Z" fill="rgba(255,255,255,0.25)"/>
+                <svg viewBox="0 0 512 512" className="w-14 h-14 text-white drop-shadow-[0_0_12px_rgba(255,255,255,0.2)]" fill="currentColor">
+                  <circle cx="256" cy="256" r="236" fill="none" stroke="currentColor" strokeWidth="12"/>
+                  <path d="M256 32 L242 232 L68 333 L256 266 L444 333 L270 232 Z" />
                 </svg>
                 <span className="text-[9px] uppercase font-bold text-foreground/45 tracking-widest mt-2">Mercedes-Benz</span>
               </div>
