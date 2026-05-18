@@ -10,7 +10,7 @@ export interface User {
   name: string;
   role: 'admin' | 'gestor' | 'vendedor';
   team_id: string | null;
-  is_paused: boolean;
+  is_paused?: boolean;
 }
 
 export interface Team {

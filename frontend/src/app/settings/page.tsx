@@ -109,7 +109,8 @@ export default function SettingsPage() {
       name: newUserForm.name,
       email: newUserForm.email,
       role: newUserForm.role,
-      team_id: newUserForm.team_id === 'none' || !newUserForm.team_id ? null : newUserForm.team_id
+      team_id: newUserForm.team_id === 'none' || !newUserForm.team_id ? null : newUserForm.team_id,
+      is_paused: false
     };
 
     const result = await api.createUser(payload);
