@@ -110,6 +110,20 @@ export default function RootLayout({
     }
   };
 
+  const handleToggleMyPause = async () => {
+    if (!activeUser || activeUser.role !== 'vendedor') return;
+    const nextState = !activeUser.is_paused;
+    const updated = await api.updateUser(activeUser.id, { is_paused: nextState });
+    if (updated) {
+      const updatedUser = { ...activeUser, is_paused: nextState };
+      setActiveUser(updatedUser);
+      api.setCurrentUser(updatedUser);
+      window.location.reload();
+    } else {
+      alert("Falha ao alterar status de ausência.");
+    }
+  };
+
   // Regras de Visualização baseadas em Perfil (Acesso de Segurança)
   const isVendedor = activeUser?.role === 'vendedor';
   const isGestor = activeUser?.role === 'gestor';
@@ -470,18 +484,24 @@ export default function RootLayout({
                 </div>
 
                 <div className="flex items-center space-x-2">
-                  <div 
-                    className={`w-2 h-2 rounded-full ${
-                      activeUser.role === 'vendedor' && activeUser.is_paused 
-                        ? 'bg-amber-500 animate-pulse' 
-                        : 'bg-emerald-500 animate-pulse'
-                    }`} 
-                    title={
-                      activeUser.role === 'vendedor' && activeUser.is_paused 
-                        ? "Rodízio de Leads Pausado" 
-                        : "Vendedor no Rodízio de Leads"
-                    } 
-                  />
+                  {activeUser.role === 'vendedor' ? (
+                    <button
+                      onClick={handleToggleMyPause}
+                      className={`text-[9px] px-2 py-0.5 rounded-full font-bold border transition-colors cursor-pointer ${
+                        activeUser.is_paused 
+                          ? 'bg-amber-500/10 text-amber-500 border-amber-500/25 hover:bg-amber-500/20' 
+                          : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/20'
+                      }`}
+                      title={activeUser.is_paused ? "Você está ausente. Clique para voltar a receber leads." : "Você está ativo no rodízio. Clique para pausar."}
+                    >
+                      {activeUser.is_paused ? '⏸️ Pausado' : '▶️ Ativo'}
+                    </button>
+                  ) : (
+                    <div 
+                      className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" 
+                      title="Administração/Gestão" 
+                    />
+                  )}
                   <button
                     onClick={handleLogout}
                     className="text-foreground/45 hover:text-red-400 p-1.5 rounded-md hover:bg-red-500/10 transition-all"

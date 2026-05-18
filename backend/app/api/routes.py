@@ -34,17 +34,28 @@ def get_leads(db: Session = Depends(get_db)):
 
 @router.post("/leads", response_model=crm.LeadResponse, tags=["Leads"], status_code=status.HTTP_201_CREATED)
 def create_lead(lead_in: crm.LeadCreate, db: Session = Depends(get_db)):
-    """Cria um novo lead e gera a atividade inicial."""
-    lead = models.Lead(**lead_in.model_dump())
+    """Cria um novo lead e gera a atividade inicial com distribuição automática."""
+    lead_data = lead_in.model_dump()
+    
+    # Se não foi atribuído a nenhum vendedor de forma explícita, aplica a distribuição automática (Round-Robin)
+    if not lead_data.get("assigned_to_id"):
+        from app.services.email_reader import get_next_seller_round_robin
+        vendedor = get_next_seller_round_robin(lead_data.get("category") or "", db)
+        if vendedor:
+            lead_data["assigned_to_id"] = vendedor.id
+            lead_data["status"] = models.LeadStatusEnum.distribuido
+            
+    lead = models.Lead(**lead_data)
     db.add(lead)
     db.commit()
     db.refresh(lead)
     
     # Criar atividade inicial
+    dist_info = f"e distribuído para {lead.assigned_to.name}" if lead.assigned_to_id else "aguardando atribuição"
     activity = models.Activity(
         lead_id=lead.id,
         activity_type=models.ActivityTypeEnum.email_recebido,
-        content=f"Lead criado via {lead.source}."
+        content=f"Lead cadastrado via {lead.source} {dist_info}."
     )
     db.add(activity)
     db.commit()
