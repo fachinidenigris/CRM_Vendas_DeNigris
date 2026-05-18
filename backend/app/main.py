@@ -17,36 +17,67 @@ from app.core import security
 from sqlalchemy import text, inspect
 
 def run_migrations():
-    # Se for PostgreSQL, precisamos atualizar o tipo ENUM físico no banco de dados!
+    # MIGRAÇÃO CRÍTICA: Se for PostgreSQL, converter as colunas ENUM para VARCHAR.
+    # Isso resolve de forma permanente o erro "invalid input value for enum leadstatusenum".
+    # A coluna passa a aceitar qualquer string, eliminando a dependência do tipo ENUM físico do PG.
     if "postgresql" in str(engine.url):
         try:
-            print("[MIGRATION] Banco PostgreSQL detectado. Verificando/Atualizando enum 'leadstatusenum'...")
-            # ALTER TYPE no PostgreSQL exige autocommit (fora de bloco transacional)
+            print("[MIGRATION-PG] Iniciando conversão de ENUM -> VARCHAR no PostgreSQL...")
             raw_conn = engine.raw_connection()
             raw_conn.autocommit = True
             cursor = raw_conn.cursor()
-            
-            # Consultar os valores existentes fisicamente no enum
+
+            # Verificar se a coluna 'status' em 'leads' ainda é do tipo ENUM
             cursor.execute("""
-                SELECT enumlabel 
-                FROM pg_enum 
-                JOIN pg_type ON pg_enum.enumtypid = pg_type.oid 
-                WHERE pg_type.typname = 'leadstatusenum';
+                SELECT data_type, udt_name
+                FROM information_schema.columns
+                WHERE table_name = 'leads' AND column_name = 'status';
             """)
-            existing_statuses = {row[0] for row in cursor.fetchall()}
-            print(f"[MIGRATION] Statuses existentes no enum do PostgreSQL: {existing_statuses}")
-            
-            new_statuses = ["novo", "qualificacao", "distribuido", "venda_realizada", "venda_perdida"]
-            for status in new_statuses:
-                if status not in existing_statuses:
-                    print(f"[MIGRATION] Status '{status}' está ausente. Adicionando ao enum 'leadstatusenum'...")
-                    cursor.execute(f"ALTER TYPE leadstatusenum ADD VALUE '{status}'")
-                    print(f"[MIGRATION] Status '{status}' adicionado com sucesso!")
-                    
+            row = cursor.fetchone()
+            if row:
+                data_type, udt_name = row
+                print(f"[MIGRATION-PG] Tipo atual de leads.status: data_type={data_type}, udt_name={udt_name}")
+                if data_type == "USER-DEFINED":
+                    print("[MIGRATION-PG] Coluna 'leads.status' é ENUM. Convertendo para VARCHAR...")
+                    cursor.execute("ALTER TABLE leads ALTER COLUMN status TYPE VARCHAR USING status::text")
+                    print("[MIGRATION-PG] ✅ leads.status convertida para VARCHAR com sucesso!")
+                else:
+                    print("[MIGRATION-PG] leads.status já é VARCHAR. Nenhuma migração necessária.")
+
+            # Verificar se a coluna 'priority' em 'leads' ainda é do tipo ENUM
+            cursor.execute("""
+                SELECT data_type, udt_name
+                FROM information_schema.columns
+                WHERE table_name = 'leads' AND column_name = 'priority';
+            """)
+            row = cursor.fetchone()
+            if row:
+                data_type, udt_name = row
+                print(f"[MIGRATION-PG] Tipo atual de leads.priority: data_type={data_type}, udt_name={udt_name}")
+                if data_type == "USER-DEFINED":
+                    print("[MIGRATION-PG] Coluna 'leads.priority' é ENUM. Convertendo para VARCHAR...")
+                    cursor.execute("ALTER TABLE leads ALTER COLUMN priority TYPE VARCHAR USING priority::text")
+                    print("[MIGRATION-PG] ✅ leads.priority convertida para VARCHAR com sucesso!")
+
+            # Verificar se a coluna 'task_type' em 'tasks' ainda é ENUM
+            cursor.execute("""
+                SELECT data_type, udt_name
+                FROM information_schema.columns
+                WHERE table_name = 'tasks' AND column_name = 'task_type';
+            """)
+            row = cursor.fetchone()
+            if row:
+                data_type, udt_name = row
+                if data_type == "USER-DEFINED":
+                    print("[MIGRATION-PG] Coluna 'tasks.task_type' é ENUM. Convertendo para VARCHAR...")
+                    cursor.execute("ALTER TABLE tasks ALTER COLUMN task_type TYPE VARCHAR USING task_type::text")
+                    print("[MIGRATION-PG] ✅ tasks.task_type convertida para VARCHAR com sucesso!")
+
             cursor.close()
             raw_conn.close()
+            print("[MIGRATION-PG] Migração de tipos ENUM -> VARCHAR concluída.")
         except Exception as err:
-            print(f"[MIGRATION] Erro ao atualizar enums do PostgreSQL: {err}")
+            print(f"[MIGRATION-PG] Erro na migração de ENUM -> VARCHAR: {err}")
 
     db = SessionLocal()
     try:

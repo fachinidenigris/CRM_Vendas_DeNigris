@@ -5,6 +5,11 @@ from datetime import datetime, timezone
 import enum
 from app.db.database import Base
 
+# NOTA ARQUITETURAL: As colunas 'status' e 'priority' da tabela 'leads' são armazenadas como VARCHAR (String)
+# no banco de dados para evitar conflitos com o tipo ENUM físico (leadstatusenum) do PostgreSQL.
+# Os enums Python abaixo são utilizados apenas para validação em tempo de código (type hints e lógica de negócio).
+# Isto garante portabilidade entre SQLite (dev) e PostgreSQL (produção no Render).
+
 class RoleEnum(str, enum.Enum):
     admin = "admin"
     gestor = "gestor"
@@ -142,8 +147,9 @@ class Lead(Base):
     is_archived = Column(Boolean, default=False, nullable=False)
     
     # Metadados Gerais
-    status = Column(SQLEnum(LeadStatusEnum), default=LeadStatusEnum.novo, nullable=False, index=True)
-    priority = Column(SQLEnum(PriorityEnum), default=PriorityEnum.media, nullable=False)
+    # IMPORTANT: Armazenado como String/VARCHAR para compatibilidade cross-db (SQLite + PostgreSQL/Render)
+    status = Column(String, default="novo", nullable=False, index=True)
+    priority = Column(String, default="media", nullable=False)
     urgency_level = Column(String, nullable=True)
     ai_summary = Column(Text, nullable=True)
     
@@ -168,7 +174,7 @@ class Task(Base):
     description = Column(Text, nullable=True)
     due_date = Column(DateTime, nullable=False)
     is_completed = Column(Boolean, default=False)
-    task_type = Column(SQLEnum(TaskTypeEnum), default=TaskTypeEnum.outro, nullable=False)
+    task_type = Column(String, default="outro", nullable=False)
     
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime, default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))
