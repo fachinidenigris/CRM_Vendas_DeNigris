@@ -22,8 +22,9 @@ export default function Home() {
     company: '',
     product_interest: '',
     city_region: '',
+    city_region: '',
     source: 'Cadastro Manual',
-    status: 'leads_novos',
+    status: 'novo',
     urgency_level: 'Normal',
     ai_summary: 'Criado manualmente pelo painel comercial.'
   });
@@ -86,8 +87,9 @@ export default function Home() {
       company: '',
       product_interest: '',
       city_region: '',
+      city_region: '',
       source: 'Cadastro Manual',
-      status: 'leads_novos',
+      status: 'novo',
       urgency_level: 'Normal',
       ai_summary: 'Criado manualmente pelo painel comercial.'
     });
@@ -108,9 +110,10 @@ export default function Home() {
   // Filtragem dos dados (Foco Operacional Extremo)
   
   // 1. Leads novos de alta urgência ou tarefas não concluídas e atrasadas
+  // 1. Leads novos de alta urgência ou tarefas não concluídas e atrasadas
   const now = new Date();
   const overdueTasks = tasks.filter(t => !t.is_completed && new Date(t.due_date) < now);
-  const urgentLeads = leads.filter(l => l.status === 'leads_novos' && l.urgency_level === 'Alta');
+  const urgentLeads = leads.filter(l => l.status === 'novo' && l.urgency_level === 'Alta');
   
   // 2. Tarefas marcadas para hoje (ou pendentes gerais)
   const todayTasks = tasks.filter(t => {
@@ -120,7 +123,8 @@ export default function Home() {
   });
 
   // 3. Todos os Novos Leads (etapa inicial do funil)
-  const newLeads = leads.filter(l => l.status === 'leads_novos');
+  // 3. Todos os Novos Leads (etapa inicial do funil)
+  const newLeads = leads.filter(l => l.status === 'novo');
 
   return (
     <div className="space-y-6">

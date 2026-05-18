@@ -11,6 +11,14 @@ class RoleEnum(str, enum.Enum):
     vendedor = "vendedor"
 
 class LeadStatusEnum(str, enum.Enum):
+    # Novo Fluxo Simplificado
+    novo = "novo"
+    qualificacao = "qualificacao"
+    distribuido = "distribuido"
+    venda_realizada = "venda_realizada"
+    venda_perdida = "venda_perdida"
+    
+    # Legado (Mantido para retrocompatibilidade de banco de dados / ENUM types)
     leads_novos = "leads_novos"
     leads_pendentes = "leads_pendentes"
     primeiro_contato_realizado = "primeiro_contato_realizado"
@@ -18,7 +26,6 @@ class LeadStatusEnum(str, enum.Enum):
     enviado_para_vendedor = "enviado_para_vendedor"
     em_negociacao = "em_negociacao"
     venda_ganha = "venda_ganha"
-    venda_perdida = "venda_perdida"
 
 class PriorityEnum(str, enum.Enum):
     baixa = "baixa"
@@ -122,9 +129,20 @@ class Lead(Base):
     
     # 8. Venda Perdida
     loss_reason = Column(String, nullable=True) # e.g. "preço", "concorrência", "sem crédito", etc.
+    loss_observation = Column(String, nullable=True)
+    reactivation_date = Column(DateTime, nullable=True)
+    
+    # 9. Venda Realizada
+    sale_date = Column(DateTime, nullable=True)
+    sale_value = Column(Integer, nullable=True)
+    sale_product = Column(String, nullable=True)
+    sale_model = Column(String, nullable=True)
+    
+    # Arquivamento
+    is_archived = Column(Boolean, default=False, nullable=False)
     
     # Metadados Gerais
-    status = Column(SQLEnum(LeadStatusEnum), default=LeadStatusEnum.leads_novos, nullable=False, index=True)
+    status = Column(SQLEnum(LeadStatusEnum), default=LeadStatusEnum.novo, nullable=False, index=True)
     priority = Column(SQLEnum(PriorityEnum), default=PriorityEnum.media, nullable=False)
     urgency_level = Column(String, nullable=True)
     ai_summary = Column(Text, nullable=True)

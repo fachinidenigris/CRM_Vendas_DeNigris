@@ -260,13 +260,10 @@ export function LeadDrawer({ isOpen, onClose, lead, onLeadUpdated }: LeadDrawerP
                 onChange={(e) => handleStatusChange(e.target.value)}
                 className="w-full h-full text-center p-3 bg-foreground/10 text-foreground/80 rounded-lg hover:bg-foreground/20 transition-all text-[10px] font-bold uppercase border-0 outline-none appearance-none cursor-pointer"
               >
-                <option value="leads_novos">Leads Novos</option>
-                <option value="leads_pendentes">Pendente / Lido</option>
-                <option value="primeiro_contato_realizado">Contato Feito</option>
-                <option value="lead_qualificado">Qualificado</option>
-                <option value="enviado_para_vendedor">Distribuído</option>
-                <option value="em_negociacao">Em Negociação</option>
-                <option value="venda_ganha">Venda Ganha</option>
+                <option value="novo">Leads Novos</option>
+                <option value="qualificacao">Qualificação</option>
+                <option value="distribuido">Distribuído</option>
+                <option value="venda_realizada">Venda Realizada</option>
                 <option value="venda_perdida">Venda Perdida</option>
               </select>
             </div>

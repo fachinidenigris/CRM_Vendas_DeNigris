@@ -93,10 +93,17 @@ class LeadCreate(BaseModel):
     close_probability: Optional[str] = None
     billing_forecast: Optional[str] = None
     
-    # Perda
+    # Status Finais e Arquivamento
     loss_reason: Optional[str] = None
+    loss_observation: Optional[str] = None
+    reactivation_date: Optional[datetime] = None
+    sale_date: Optional[datetime] = None
+    sale_value: Optional[float] = None
+    sale_product: Optional[str] = None
+    sale_model: Optional[str] = None
+    is_archived: Optional[bool] = False
     
-    status: Optional[LeadStatusEnum] = LeadStatusEnum.leads_novos
+    status: Optional[LeadStatusEnum] = LeadStatusEnum.novo
     priority: Optional[PriorityEnum] = PriorityEnum.media
     urgency_level: Optional[str] = None
     ai_summary: Optional[str] = None
@@ -140,8 +147,15 @@ class LeadUpdate(BaseModel):
     close_probability: Optional[str] = None
     billing_forecast: Optional[str] = None
     
-    # Perda
+    # Status Finais e Arquivamento
     loss_reason: Optional[str] = None
+    loss_observation: Optional[str] = None
+    reactivation_date: Optional[datetime] = None
+    sale_date: Optional[datetime] = None
+    sale_value: Optional[float] = None
+    sale_product: Optional[str] = None
+    sale_model: Optional[str] = None
+    is_archived: Optional[bool] = None
     
     status: Optional[LeadStatusEnum] = None
     priority: Optional[PriorityEnum] = None

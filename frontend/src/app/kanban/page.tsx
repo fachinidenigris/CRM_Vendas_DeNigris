@@ -16,7 +16,7 @@ export default function KanbanPage() {
     product_interest: '',
     city_region: '',
     source: 'Cadastro Manual',
-    status: 'leads_novos',
+    status: 'novo',
     urgency_level: 'Normal',
     ai_summary: 'Criado manualmente pelo painel comercial.'
   });
@@ -36,7 +36,7 @@ export default function KanbanPage() {
       product_interest: '',
       city_region: '',
       source: 'Cadastro Manual',
-      status: 'leads_novos',
+      status: 'novo',
       urgency_level: 'Normal',
       ai_summary: 'Criado manualmente pelo painel comercial.'
     });

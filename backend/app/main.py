@@ -35,6 +35,38 @@ def run_migrations():
             db.execute(text("UPDATE users SET is_paused = FALSE WHERE is_paused IS NULL"))
             db.commit()
             print("[MIGRATION] Coluna 'is_paused' adicionada com sucesso.")
+            
+        # Leads migrations
+        lead_columns = [c["name"] for c in inspector.get_columns("leads")]
+        
+        new_columns = [
+            ("loss_observation", "VARCHAR"),
+            ("reactivation_date", "TIMESTAMP"),
+            ("sale_date", "TIMESTAMP"),
+            ("sale_value", "FLOAT"),
+            ("sale_product", "VARCHAR"),
+            ("sale_model", "VARCHAR"),
+            ("is_archived", "BOOLEAN DEFAULT FALSE")
+        ]
+        
+        for col_name, col_type in new_columns:
+            if col_name not in lead_columns:
+                print(f"[MIGRATION] Coluna '{col_name}' não encontrada na tabela 'leads'. Adicionando...")
+                db.execute(text(f"ALTER TABLE leads ADD COLUMN {col_name} {col_type}"))
+                db.commit()
+                
+        # Status Migration (Legado -> Novo Fluxo)
+        print("[MIGRATION] Sincronizando status antigos de leads para o novo fluxo...")
+        db.execute(text("UPDATE leads SET status = 'novo' WHERE status IN ('leads_novos', 'leads_pendentes')"))
+        db.execute(text("UPDATE leads SET status = 'qualificacao' WHERE status IN ('primeiro_contato_realizado', 'lead_qualificado')"))
+        db.execute(text("UPDATE leads SET status = 'distribuido' WHERE status IN ('enviado_para_vendedor', 'em_negociacao')"))
+        db.execute(text("UPDATE leads SET status = 'venda_realizada' WHERE status = 'venda_ganha'"))
+        db.commit()
+        
+        # Garantir integridade de arquivamento
+        db.execute(text("UPDATE leads SET is_archived = FALSE WHERE is_archived IS NULL"))
+        db.commit()
+
     except Exception as e:
         print(f"[MIGRATION] Erro ao executar migrações automáticas: {e}")
         db.rollback()

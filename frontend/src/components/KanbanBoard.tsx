@@ -1,18 +1,15 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-import { MoreVertical, Clock, MessageSquare, Briefcase, RefreshCw, Calendar, Tag, User as UserIcon } from 'lucide-react';
-import { api, Lead } from '@/lib/api';
+import { MoreVertical, Clock, MessageSquare, Briefcase, RefreshCw, Calendar, Tag, User as UserIcon, Info } from 'lucide-react';
+import { api, Lead, User as UserType } from '@/lib/api';
 import { LeadDrawer } from './LeadDrawer';
 
 const COLUMNS = [
-  { id: 'leads_novos', title: 'Leads Novos', color: 'border-indigo-500', bg: 'bg-indigo-500/5' },
-  { id: 'leads_pendentes', title: 'Pendente / Lido', color: 'border-cyan-500', bg: 'bg-cyan-500/5' },
-  { id: 'primeiro_contato_realizado', title: 'Contato Feito', color: 'border-blue-500', bg: 'bg-blue-500/5' },
-  { id: 'lead_qualificado', title: 'Qualificado', color: 'border-teal-500', bg: 'bg-teal-500/5' },
-  { id: 'enviado_para_vendedor', title: 'Distribuído', color: 'border-pink-500', bg: 'bg-pink-500/5' },
-  { id: 'em_negociacao', title: 'Em Negociação', color: 'border-yellow-500', bg: 'bg-yellow-500/5' },
-  { id: 'venda_ganha', title: 'Ganhou / Faturado', color: 'border-emerald-500', bg: 'bg-emerald-500/5' },
-  { id: 'venda_perdida', title: 'Perdido', color: 'border-red-500', bg: 'bg-red-500/5' },
+  { id: 'novo', title: 'Leads Novos', color: 'border-indigo-500', bg: 'bg-indigo-500/5', help: 'Leads recém-chegados que ainda não foram atendidos.' },
+  { id: 'qualificacao', title: 'Qualificação', color: 'border-blue-500', bg: 'bg-blue-500/5', help: 'Fase de sondagem: descobrir necessidade, capacidade financeira e timing.' },
+  { id: 'distribuido', title: 'Distribuído', color: 'border-yellow-500', bg: 'bg-yellow-500/5', help: 'Lead atribuído e em negociação ativa com vendedor.' },
+  { id: 'venda_realizada', title: 'Venda Realizada', color: 'border-emerald-500', bg: 'bg-emerald-500/5', help: 'Negócio fechado com sucesso.' },
+  { id: 'venda_perdida', title: 'Venda Perdida', color: 'border-red-500', bg: 'bg-red-500/5', help: 'Negociação encerrada sem fechamento.' },
 ];
 
 export function KanbanBoard() {
@@ -21,20 +18,31 @@ export function KanbanBoard() {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
+  const [users, setUsers] = useState<UserType[]>([]);
 
   const fetchLeads = async () => {
     setLoading(true);
-    const data = await api.getLeads();
-    
-    const activeUser = api.getCurrentUser();
-    let filtered = data;
-    
-    if (activeUser && activeUser.role === 'vendedor') {
-      filtered = data.filter(l => l.assigned_to_id === activeUser.id);
+    try {
+      const data = await api.getLeads();
+      const usersData = await api.getUsers();
+      setUsers(usersData);
+      
+      const activeUser = api.getCurrentUser();
+      let filtered = data;
+      
+      if (activeUser && activeUser.role === 'vendedor') {
+        filtered = data.filter(l => l.assigned_to_id === activeUser.id);
+      }
+      
+      // Auto-Arquivamento (oculta da tela se is_archived for true)
+      filtered = filtered.filter(l => !l.is_archived);
+      
+      setLeads(filtered);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
-    
-    setLeads(filtered);
-    setLoading(false);
   };
 
   useEffect(() => {
@@ -114,12 +122,13 @@ export function KanbanBoard() {
           >
             {/* Header da Coluna */}
             <div className={`p-4 border-t-4 ${col.color} bg-card rounded-t-xl border-b border-border flex justify-between items-center shadow-sm`}>
-              <div>
+              <div className="flex items-center space-x-2">
                 <h3 className="font-semibold text-sm text-foreground/90">{col.title}</h3>
-                <span className="text-xs text-foreground/50 font-normal">
-                  {colLeads.length} {colLeads.length === 1 ? 'lead' : 'leads'}
-                </span>
+                <Info size={14} className="text-foreground/30 hover:text-primary transition-colors cursor-help" title={col.help} />
               </div>
+              <span className="text-xs text-foreground/50 font-normal">
+                {colLeads.length}
+              </span>
             </div>
 
             {/* Área de Cards */}
@@ -138,9 +147,18 @@ export function KanbanBoard() {
                     
                     <div className="flex justify-between items-start mb-2 pl-2">
                       <div className="flex items-center space-x-2 max-w-[85%]">
-                        <span className={`shrink-0 w-2 h-2 rounded-full ${lead.urgency_level === 'SLA Atrasado' ? 'bg-red-500 animate-pulse' : 'bg-green-500'}`}></span>
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-foreground/60 truncate" title={lead.urgency_level || 'Normal'}>
-                          {lead.urgency_level || 'Atendimento OK'}
+                        {/* Prioridade */}
+                        {lead.priority && (
+                          <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
+                            lead.priority === 'alta' ? 'bg-red-500/10 text-red-500' :
+                            lead.priority === 'media' ? 'bg-yellow-500/10 text-yellow-500' :
+                            'bg-slate-500/10 text-slate-500'
+                          }`}>
+                            Prio {lead.priority}
+                          </span>
+                        )}
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-foreground/50 truncate">
+                          {lead.source || 'IMAP'}
                         </span>
                       </div>
                       <button className="text-foreground/30 hover:text-foreground transition-colors shrink-0">
@@ -182,15 +200,19 @@ export function KanbanBoard() {
 
                       {/* Rodapé do Card */}
                       <div className="flex justify-between items-center mt-4 pt-3 border-t border-border">
-                        <div className="flex items-center space-x-1">
+                        <div className="flex items-center space-x-1" title="Vendedor Atribuído">
                           <UserIcon size={12} className="text-foreground/40" />
-                          <span className="text-[10px] text-foreground/50 font-medium">
-                            {lead.phone ? lead.phone : 'Sem fone'}
+                          <span className="text-[10px] text-foreground/60 font-medium truncate max-w-[120px]">
+                            {lead.assigned_to_id ? (users.find(u => u.id === lead.assigned_to_id)?.name || 'Desconhecido') : 'Sem vendedor'}
                           </span>
                         </div>
-                        <div className="flex text-foreground/40 items-center space-x-1 text-[10px]">
+                        <div className="flex text-foreground/40 items-center space-x-1 text-[10px]" title="Tempo sem atualização">
                           <Clock size={11} />
-                          <span>{new Date(lead.created_at).toLocaleDateString('pt-BR')}</span>
+                          <span>
+                            {Math.floor((new Date().getTime() - new Date(lead.updated_at).getTime()) / (1000 * 3600 * 24)) === 0 
+                              ? 'Hoje' 
+                              : `${Math.floor((new Date().getTime() - new Date(lead.updated_at).getTime()) / (1000 * 3600 * 24))} d atrás`}
+                          </span>
                         </div>
                       </div>
                     </div>

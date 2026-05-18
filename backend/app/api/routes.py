@@ -45,19 +45,15 @@ def update_lead(lead_id: UUID, lead_in: crm.LeadUpdate, db: Session = Depends(ge
     
     update_data = lead_in.model_dump(exclude_unset=True)
     status_changed = False
+    assigned_changed = False
     old_status = lead.status
+    old_assigned_to = lead.assigned_to_id
     
     if "status" in update_data and update_data["status"] != lead.status:
         status_changed = True
-        # Automações de status comerciais:
-        # Se for visualizado pela primeira vez, registra visualized_at
-        if lead.status == models.LeadStatusEnum.leads_novos and update_data["status"] == models.LeadStatusEnum.leads_pendentes:
-            if not lead.visualized_at:
-                lead.visualized_at = datetime.datetime.now(datetime.timezone.utc)
-                
-        # Se for para primeiro contato realizado, atualiza data do último contato
-        if update_data["status"] == models.LeadStatusEnum.primeiro_contato_realizado:
-            lead.last_contact_at = datetime.datetime.now(datetime.timezone.utc)
+        
+    if "assigned_to_id" in update_data and update_data["assigned_to_id"] != lead.assigned_to_id:
+        assigned_changed = True
             
     # Sempre atualiza a data da última interação
     lead.last_interaction_at = datetime.datetime.now(datetime.timezone.utc)
@@ -71,7 +67,21 @@ def update_lead(lead_id: UUID, lead_in: crm.LeadUpdate, db: Session = Depends(ge
         activity = models.Activity(
             lead_id=lead.id,
             activity_type=models.ActivityTypeEnum.status_alterado,
-            content=f"Status alterado de {old_status.value} para {lead.status.value}"
+            content=f"Status alterado de '{old_status.value}' para '{lead.status.value}'."
+        )
+        db.add(activity)
+        
+    if assigned_changed:
+        new_user = db.query(models.User).filter(models.User.id == lead.assigned_to_id).first() if lead.assigned_to_id else None
+        old_user = db.query(models.User).filter(models.User.id == old_assigned_to).first() if old_assigned_to else None
+        
+        old_name = old_user.name if old_user else "Sistema"
+        new_name = new_user.name if new_user else "Nenhum"
+        
+        activity = models.Activity(
+            lead_id=lead.id,
+            activity_type=models.ActivityTypeEnum.nota_adicionada,
+            content=f"Responsabilidade transferida: de {old_name} para {new_name}."
         )
         db.add(activity)
         

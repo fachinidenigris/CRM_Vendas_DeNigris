@@ -74,8 +74,16 @@ export interface Lead {
   close_probability?: string;
   billing_forecast?: string;
   
-  // Perda
+  // Status Finais e Arquivamento
   loss_reason?: string;
+  loss_observation?: string;
+  reactivation_date?: string;
+  sale_date?: string;
+  sale_value?: number;
+  sale_product?: string;
+  sale_model?: string;
+  is_archived?: boolean;
+  
   assigned_to_id?: string | null;
 }
 
