@@ -20,3 +20,6 @@ Este arquivo registra e rastreia o andamento de todas as tarefas comerciais e t�
 | 10 | Kanban: Correção do Scroll Lateral | ✅ Concluído | 18/05/2026 | 18/05/2026 | Corrigido scroll lateral do Kanban aplicando h-[calc(100vh-190px)] no board e rolagem independente h-full/overflow-y nas colunas. |
 | 11 | Histórico/Arquivos: Filtro de Período | ✅ Concluído | 18/05/2026 | 18/05/2026 | Adicionado seletor e filtro de período (Hoje, Esta Semana, Este Mês) no Histórico de Fechamentos. |
 | 12 | Telas de Relatórios (Analytics) & Marketing | ✅ Concluído | 18/05/2026 | 18/05/2026 | Criadas as novas telas e implementada a integração completa dos módulos de Relatórios Comerciais e Automação de Marketing com a barra de navegação principal. |
+| 13 | Automação de Marketing: Aviso Beta | ✅ Concluído | 18/05/2026 | 18/05/2026 | Adicionado banner visual informativo destacando o caráter simulado do módulo de marketing. |
+| 14 | Correção de Salvamento Manual de Leads (PostgreSQL) | ✅ Concluído | 18/05/2026 | 18/05/2026 | Resolvido o erro no PostgreSQL de produção que impedia salvamento de novos leads. |
+| 15 | Correção no Processador de E-mails IMAP | ✅ Concluído | 18/05/2026 | 18/05/2026 | Criada rotina de auto-migração de enums (leadstatusenum) no banco de dados para sincronização do fluxo. |

@@ -99,6 +99,17 @@ export default function MarketingPage() {
         </div>
       </header>
 
+      {/* Banner de Demonstração / Versão Beta */}
+      <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 rounded-xl p-4 flex items-center space-x-3.5 shadow-sm">
+        <Sparkles size={20} className="shrink-0 animate-pulse" />
+        <div>
+          <h4 className="text-xs font-bold uppercase tracking-wider">Módulo em Demonstração (Versão Beta)</h4>
+          <p className="text-[10px] text-foreground/70 mt-1 leading-relaxed">
+            As campanhas, segmentações por IA, disparos de e-mail/WhatsApp e taxas de engajamento mostradas nesta tela são simulações para validação de fluxos e experiência de uso comercial.
+          </p>
+        </div>
+      </div>
+
       {/* Grid de Performance de Marketing */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-xl p-5 shadow-sm">

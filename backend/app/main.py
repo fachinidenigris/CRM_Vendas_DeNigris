@@ -17,6 +17,28 @@ from app.core import security
 from sqlalchemy import text, inspect
 
 def run_migrations():
+    # Se for PostgreSQL, precisamos atualizar o tipo ENUM físico no banco de dados!
+    if "postgresql" in str(engine.url):
+        try:
+            print("[MIGRATION] Banco PostgreSQL detectado. Verificando/Atualizando enum 'leadstatusenum'...")
+            # ALTER TYPE no PostgreSQL exige autocommit (fora de bloco transacional)
+            raw_conn = engine.raw_connection()
+            raw_conn.autocommit = True
+            cursor = raw_conn.cursor()
+            
+            new_statuses = ["novo", "qualificacao", "distribuido", "venda_realizada", "venda_perdida"]
+            for status in new_statuses:
+                try:
+                    cursor.execute(f"ALTER TYPE leadstatusenum ADD VALUE '{status}'")
+                    print(f"[MIGRATION] Status '{status}' adicionado ao enum 'leadstatusenum'!")
+                except Exception as e:
+                    # Se o status já existir, o psycopg2 levanta uma exceção indicando duplicata, podemos ignorar com segurança
+                    pass
+            cursor.close()
+            raw_conn.close()
+        except Exception as err:
+            print(f"[MIGRATION] Erro ao atualizar enums do PostgreSQL: {err}")
+
     db = SessionLocal()
     try:
         inspector = inspect(engine)
