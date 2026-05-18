@@ -36,8 +36,8 @@ def parse_email_content(email_body: str) -> Optional[EmailParsedData]:
 
     genai.configure(api_key=settings.GEMINI_API_KEY)
     
-    # Utilizando o gemini-1.5-flash-latest
-    model = genai.GenerativeModel('gemini-1.5-flash-latest', generation_config={"response_mime_type": "application/json"})
+    # Utilizando o gemini-2.5-flash
+    model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"response_mime_type": "application/json"})
     
     prompt = f"""
     Você é um assistente especialista em ler e-mails de leads comerciais de veículos comerciais e extrair os dados mais importantes para um sistema de CRM.
