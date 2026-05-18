@@ -41,7 +41,8 @@ export default function Home() {
     
     if (activeUser && activeUser.role === 'vendedor') {
       filteredLeads = fetchedLeads.filter(l => l.assigned_to_id === activeUser.id);
-      filteredTasks = fetchedTasks.filter(t => t.assigned_to_id === activeUser.id);
+      const myLeadIds = new Set(filteredLeads.map(l => l.id));
+      filteredTasks = fetchedTasks.filter(t => myLeadIds.has(t.lead_id));
     }
     
     setLeads(filteredLeads);
