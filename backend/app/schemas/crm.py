@@ -8,6 +8,7 @@ class UserBase(BaseModel):
     email: str
     name: str
     role: RoleEnum
+    is_paused: Optional[bool] = False
 
 class UserCreate(UserBase):
     pass
@@ -15,6 +16,7 @@ class UserCreate(UserBase):
 class UserResponse(UserBase):
     id: UUID
     team_id: Optional[UUID] = None
+    is_paused: bool
     created_at: datetime
     updated_at: datetime
     model_config = ConfigDict(from_attributes=True)
@@ -24,6 +26,7 @@ class UserUpdate(BaseModel):
     name: Optional[str] = None
     role: Optional[RoleEnum] = None
     team_id: Optional[UUID] = None
+    is_paused: Optional[bool] = None
 
 class TeamBase(BaseModel):
     name: str

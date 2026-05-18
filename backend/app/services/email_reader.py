@@ -21,6 +21,55 @@ def connect_imap():
         logger.error(f"Falha ao conectar no IMAP: {e}")
         return None
 
+def get_next_seller_round_robin(category: str, db: Session) -> models.User | None:
+    """Busca o próximo vendedor ativo, não pausado, de forma justa por rodízio (por equipe ou global)."""
+    # 1. Obter todos os vendedores ativos e não pausados
+    active_sellers = db.query(models.User).filter(
+        models.User.role == models.RoleEnum.vendedor,
+        models.User.is_paused == False
+    ).all()
+    
+    if not active_sellers:
+        return None
+        
+    # 2. Distribuição por equipes
+    # Se houver mais de uma equipe cadastrada, tentar direcionar de acordo com a categoria do lead
+    teams = db.query(models.Team).all()
+    target_team = None
+    if len(teams) > 1 and category:
+        category_lower = category.lower()
+        for t in teams:
+            if t.name.lower() in category_lower or category_lower in t.name.lower():
+                target_team = t
+                break
+                
+    if target_team:
+        # Filtrar os vendedores ativos e não pausados dessa equipe específica
+        team_sellers = [s for s in active_sellers if s.team_id == target_team.id]
+        if team_sellers:
+            active_sellers = team_sellers
+            
+    # 3. Lógica matemática de Rodízio (Fair Distribution):
+    # Quem recebeu lead há mais tempo (ou nunca recebeu) é o próximo
+    selected_seller = None
+    oldest_assigned_time = None
+    
+    for seller in active_sellers:
+        # Pega o lead mais recente criado para esse vendedor
+        latest_lead = db.query(models.Lead).filter(
+            models.Lead.assigned_to_id == seller.id
+        ).order_by(models.Lead.created_at.desc()).first()
+        
+        if not latest_lead:
+            # Nunca recebeu um lead -> prioridade máxima absoluta
+            return seller
+            
+        if oldest_assigned_time is None or latest_lead.created_at < oldest_assigned_time:
+            oldest_assigned_time = latest_lead.created_at
+            selected_seller = seller
+            
+    return selected_seller
+
 def fetch_unread_emails():
     """Busca e-mails não lidos no Gmail."""
     mail = connect_imap()
@@ -99,8 +148,8 @@ def fetch_unread_emails():
                         # 2. Salvar no Banco
                         db: Session = SessionLocal()
                         try:
-                            # Tentar distribuir automaticamente (Pega o primeiro vendedor, lógica de MVP)
-                            vendedor = db.query(models.User).filter(models.User.role == models.RoleEnum.vendedor).first()
+                            # Tentar distribuir automaticamente via rodízio inteligente (round-robin)
+                            vendedor = get_next_seller_round_robin(ai_data.category, db)
                             
                             novo_lead = models.Lead(
                                 name=ai_data.name,

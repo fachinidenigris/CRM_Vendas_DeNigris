@@ -10,6 +10,7 @@ export interface User {
   name: string;
   role: 'admin' | 'gestor' | 'vendedor';
   team_id: string | null;
+  is_paused: boolean;
 }
 
 export interface Team {
@@ -353,6 +354,28 @@ export const api = {
     } catch (err) {
       console.error(err);
       return null;
+    }
+  },
+
+  getCurrentUser: (): User | null => {
+    if (typeof window === 'undefined') return null;
+    const stored = localStorage.getItem('currentUser');
+    if (stored) {
+      try {
+        return JSON.parse(stored);
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  },
+
+  setCurrentUser: (user: User | null): void => {
+    if (typeof window === 'undefined') return;
+    if (user) {
+      localStorage.setItem('currentUser', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('currentUser');
     }
   }
 };

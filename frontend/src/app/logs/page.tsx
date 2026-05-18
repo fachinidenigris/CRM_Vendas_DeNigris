@@ -1,13 +1,25 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { api, SystemLog } from '@/lib/api';
-import { RefreshCw, Terminal, CheckCircle2, AlertTriangle, AlertOctagon, Info, Eye } from 'lucide-react';
+import { RefreshCw, Terminal, CheckCircle2, AlertTriangle, AlertOctagon, Info, Lock } from 'lucide-react';
 
 export default function LogsPage() {
   const [logs, setLogs] = useState<SystemLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterType, setFilterType] = useState<string>('ALL');
+  const [activeUser, setActiveUser] = useState<any | null>(null);
+
+  // Helper local para obter data atual em formato YYYY-MM-DD
+  const getTodayString = () => {
+    const d = new Date();
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${d.getFullYear()}-${month}-${day}`;
+  };
+
+  const [selectedDate, setSelectedDate] = useState<string>(getTodayString());
 
   const loadLogs = async () => {
     setLoading(true);
@@ -18,6 +30,7 @@ export default function LogsPage() {
 
   useEffect(() => {
     loadLogs();
+    setActiveUser(api.getCurrentUser());
   }, []);
 
   // Helper de Renderização de Ícones
@@ -51,16 +64,42 @@ export default function LogsPage() {
     }
   };
 
-  // Filtragem dos Logs
-  const filteredLogs = filterType === 'ALL' 
-    ? logs 
-    : logs.filter(l => l.log_type === filterType);
+  // Filtragem dos Logs por data e tipo
+  const filteredLogs = logs.filter(l => {
+    // 1. Filtrar por data local do cliente (YYYY-MM-DD)
+    const logDate = new Date(l.created_at);
+    const month = String(logDate.getMonth() + 1).padStart(2, '0');
+    const day = String(logDate.getDate()).padStart(2, '0');
+    const logDateStr = `${logDate.getFullYear()}-${month}-${day}`;
+    const matchesDate = logDateStr === selectedDate;
 
-  if (loading) {
+    // 2. Filtrar por tipo
+    const matchesType = filterType === 'ALL' || l.log_type === filterType;
+
+    return matchesDate && matchesType;
+  });
+
+  if (loading && logs.length === 0) {
     return (
       <div className="flex flex-col justify-center items-center h-[50vh] space-y-3 text-foreground/50">
         <RefreshCw className="animate-spin" size={32} />
         <span>Abrindo console de logs comerciais em tempo real...</span>
+      </div>
+    );
+  }
+
+  // Bloqueio de Segurança: Apenas Admin/Diretoria tem acesso a logs
+  if (activeUser && activeUser.role !== 'admin') {
+    return (
+      <div className="flex flex-col justify-center items-center h-[60vh] space-y-4 text-center max-w-md mx-auto">
+        <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center border border-red-500/20 shadow-lg">
+          <Lock size={32} />
+        </div>
+        <h3 className="text-xl font-bold tracking-tight">Acesso Restrito</h3>
+        <p className="text-sm text-foreground/60">Seu perfil comercial atual não possui permissões para acessar o console de logs corporativos do sistema.</p>
+        <Link href="/" className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/95 transition-colors">
+          Voltar para Agenda
+        </Link>
       </div>
     );
   }
@@ -79,44 +118,106 @@ export default function LogsPage() {
         </button>
       </header>
 
-      {/* Filtros */}
+      {/* Seletor de Data (Calendário) */}
+      <div className="flex flex-wrap items-center gap-3 bg-card border border-border p-4 rounded-xl shadow-sm">
+        <span className="text-xs font-bold uppercase text-foreground/60 tracking-wider">Logs por Período:</span>
+        <input 
+          type="date" 
+          value={selectedDate}
+          onChange={(e) => setSelectedDate(e.target.value)}
+          className="bg-background border border-border rounded-lg px-3 py-1.5 text-xs font-semibold focus:ring-2 focus:ring-primary/45 outline-none text-foreground"
+        />
+        <button 
+          onClick={() => setSelectedDate(getTodayString())}
+          className="text-xs hover:bg-foreground/5 border border-border px-3 py-1.5 rounded-lg font-bold transition-all"
+        >
+          Hoje
+        </button>
+        <button 
+          onClick={() => {
+            const yesterday = new Date();
+            yesterday.setDate(yesterday.getDate() - 1);
+            const month = String(yesterday.getMonth() + 1).padStart(2, '0');
+            const day = String(yesterday.getDate()).padStart(2, '0');
+            setSelectedDate(`${yesterday.getFullYear()}-${month}-${day}`);
+          }}
+          className="text-xs hover:bg-foreground/5 border border-border px-3 py-1.5 rounded-lg font-bold transition-all"
+        >
+          Ontem
+        </button>
+        <div className="ml-auto text-xs text-foreground/45 font-medium font-mono">
+          Exibindo {filteredLogs.length} eventos de {logs.length} totais carregados.
+        </div>
+      </div>
+
+      {/* Filtros por Tipo */}
       <div className="flex flex-wrap gap-2 pb-2">
         <button 
           onClick={() => setFilterType('ALL')}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filterType === 'ALL' ? 'bg-primary text-primary-foreground border-primary' : 'bg-card border-border hover:bg-foreground/5 text-foreground/75'}`}
         >
-          Todos ({logs.length})
+          Todos ({logs.filter(l => {
+            const logDate = new Date(l.created_at);
+            const month = String(logDate.getMonth() + 1).padStart(2, '0');
+            const day = String(logDate.getDate()).padStart(2, '0');
+            const logDateStr = `${logDate.getFullYear()}-${month}-${day}`;
+            return logDateStr === selectedDate;
+          }).length})
         </button>
         <button 
           onClick={() => setFilterType('EMAIL_RECEBIDO')}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filterType === 'EMAIL_RECEBIDO' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-card border-border hover:bg-emerald-500/10 text-emerald-500'}`}
         >
-          Leads Recebidos ({logs.filter(l => l.log_type === 'EMAIL_RECEBIDO').length})
+          Leads Recebidos ({logs.filter(l => {
+            const logDate = new Date(l.created_at);
+            const month = String(logDate.getMonth() + 1).padStart(2, '0');
+            const day = String(logDate.getDate()).padStart(2, '0');
+            const logDateStr = `${logDate.getFullYear()}-${month}-${day}`;
+            return logDateStr === selectedDate && l.log_type === 'EMAIL_RECEBIDO';
+          }).length})
         </button>
         <button 
           onClick={() => setFilterType('EMAIL_IGNORADO')}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filterType === 'EMAIL_IGNORADO' ? 'bg-foreground/20 text-foreground border-foreground/35' : 'bg-card border-border hover:bg-foreground/5 text-foreground/60'}`}
         >
-          Ignorados pelo Filtro ({logs.filter(l => l.log_type === 'EMAIL_IGNORADO').length})
+          Ignorados ({logs.filter(l => {
+            const logDate = new Date(l.created_at);
+            const month = String(logDate.getMonth() + 1).padStart(2, '0');
+            const day = String(logDate.getDate()).padStart(2, '0');
+            const logDateStr = `${logDate.getFullYear()}-${month}-${day}`;
+            return logDateStr === selectedDate && l.log_type === 'EMAIL_IGNORADO';
+          }).length})
         </button>
         <button 
           onClick={() => setFilterType('WARNING')}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filterType === 'WARNING' ? 'bg-amber-600 text-white border-amber-600' : 'bg-card border-border hover:bg-amber-500/10 text-amber-500'}`}
         >
-          Alertas de SLA ({logs.filter(l => l.log_type === 'WARNING').length})
+          Alertas SLA ({logs.filter(l => {
+            const logDate = new Date(l.created_at);
+            const month = String(logDate.getMonth() + 1).padStart(2, '0');
+            const day = String(logDate.getDate()).padStart(2, '0');
+            const logDateStr = `${logDate.getFullYear()}-${month}-${day}`;
+            return logDateStr === selectedDate && l.log_type === 'WARNING';
+          }).length})
         </button>
         <button 
           onClick={() => setFilterType('ERROR')}
           className={`px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${filterType === 'ERROR' ? 'bg-red-600 text-white border-red-600' : 'bg-card border-border hover:bg-red-500/10 text-red-500'}`}
         >
-          Erros de Sistema ({logs.filter(l => l.log_type === 'ERROR').length})
+          Erros ({logs.filter(l => {
+            const logDate = new Date(l.created_at);
+            const month = String(logDate.getMonth() + 1).padStart(2, '0');
+            const day = String(logDate.getDate()).padStart(2, '0');
+            const logDateStr = `${logDate.getFullYear()}-${month}-${day}`;
+            return logDateStr === selectedDate && l.log_type === 'ERROR';
+          }).length})
         </button>
       </div>
 
       {/* Feed de Logs */}
-      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3 font-mono text-sm max-h-[70vh] overflow-y-auto">
+      <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-3 font-mono text-sm max-h-[60vh] overflow-y-auto">
         {filteredLogs.length === 0 ? (
-          <div className="text-center py-12 text-foreground/40 italic">Nenhum evento registrado com o filtro selecionado.</div>
+          <div className="text-center py-12 text-foreground/40 italic">Nenhum evento registrado nesta data com o filtro selecionado.</div>
         ) : (
           filteredLogs.map((log) => (
             <div 

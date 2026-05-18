@@ -49,6 +49,7 @@ class User(Base):
     email = Column(String, unique=True, index=True, nullable=False)
     name = Column(String, nullable=False)
     role = Column(SQLEnum(RoleEnum), default=RoleEnum.vendedor, nullable=False)
+    is_paused = Column(Boolean, default=False, nullable=False)
     
     # Relação com equipes
     team_id = Column(Uuid, ForeignKey("teams.id"), nullable=True)

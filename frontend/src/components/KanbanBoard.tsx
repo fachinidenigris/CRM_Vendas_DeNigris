@@ -25,7 +25,15 @@ export function KanbanBoard() {
   const fetchLeads = async () => {
     setLoading(true);
     const data = await api.getLeads();
-    setLeads(data);
+    
+    const activeUser = api.getCurrentUser();
+    let filtered = data;
+    
+    if (activeUser && activeUser.role === 'vendedor') {
+      filtered = data.filter(l => l.assigned_to_id === activeUser.id);
+    }
+    
+    setLeads(filtered);
     setLoading(false);
   };
 

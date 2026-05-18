@@ -1,8 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { api, User, Team } from '@/lib/api';
-import { RefreshCw, Users, Shield, UserCheck, Plus, Settings, Edit, Trash2 } from 'lucide-react';
+import { RefreshCw, Users, Shield, UserCheck, Plus, Settings, Edit, Trash2, Lock } from 'lucide-react';
 
 export default function SettingsPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -37,6 +38,8 @@ export default function SettingsPage() {
     team_id: ''
   });
 
+  const [activeUser, setActiveUser] = useState<User | null>(null);
+
   const loadData = async () => {
     setLoading(true);
     const [fetchedUsers, fetchedTeams] = await Promise.all([
@@ -50,6 +53,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     loadData();
+    setActiveUser(api.getCurrentUser());
   }, []);
 
   // --- ACTIONS: TEAMS ---
@@ -164,6 +168,15 @@ export default function SettingsPage() {
     }
   };
 
+  const handleTogglePause = async (user: User) => {
+    const updated = await api.updateUser(user.id, { is_paused: !user.is_paused });
+    if (updated) {
+      loadData();
+    } else {
+      alert("Falha ao alterar status de rodízio do profissional.");
+    }
+  };
+
   // Helpers de Renderização
   const getRoleBadge = (role: string) => {
     switch (role) {
@@ -193,6 +206,21 @@ export default function SettingsPage() {
       <div className="flex flex-col justify-center items-center h-[50vh] space-y-3 text-foreground/50">
         <RefreshCw className="animate-spin" size={32} />
         <span>Buscando usuários e organograma comercial...</span>
+      </div>
+    );
+  }
+
+  if (activeUser && activeUser.role === 'vendedor') {
+    return (
+      <div className="flex flex-col justify-center items-center h-[60vh] space-y-4 text-center max-w-md mx-auto">
+        <div className="w-16 h-16 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center border border-red-500/20 shadow-lg">
+          <Lock size={32} />
+        </div>
+        <h3 className="text-xl font-bold tracking-tight">Acesso Restrito</h3>
+        <p className="text-sm text-foreground/60">Seu perfil comercial de **Vendedor** não possui permissões para acessar as configurações de equipes ou organogramas.</p>
+        <Link href="/" className="bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold hover:bg-primary/95 transition-colors">
+          Voltar para Agenda
+        </Link>
       </div>
     );
   }
@@ -244,7 +272,22 @@ export default function SettingsPage() {
                         <div className="text-xs text-foreground/50">{user.email}</div>
                       </td>
                       <td className="py-4">
-                        {getRoleBadge(user.role)}
+                        <div className="flex flex-col space-y-1">
+                          {getRoleBadge(user.role)}
+                          {user.role === 'vendedor' && (
+                            <button
+                              onClick={() => handleTogglePause(user)}
+                              className={`text-[9px] px-2 py-0.5 rounded-full font-bold w-fit border transition-colors ${
+                                user.is_paused 
+                                  ? 'bg-amber-500/10 text-amber-500 border-amber-500/25 hover:bg-amber-500/20' 
+                                  : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/20'
+                              }`}
+                              title={user.is_paused ? "Clique para ativar no rodízio de leads" : "Clique para pausar do rodízio de leads"}
+                            >
+                              {user.is_paused ? '⏸️ Pausado' : '▶️ Ativo (Rodízio)'}
+                            </button>
+                          )}
+                        </div>
                       </td>
                       <td className="py-4">
                         {getTeamName(user.team_id)}

@@ -34,8 +34,18 @@ export default function Home() {
       api.getLeads(),
       api.getTasks()
     ]);
-    setLeads(fetchedLeads);
-    setTasks(fetchedTasks);
+    
+    const activeUser = api.getCurrentUser();
+    let filteredLeads = fetchedLeads;
+    let filteredTasks = fetchedTasks;
+    
+    if (activeUser && activeUser.role === 'vendedor') {
+      filteredLeads = fetchedLeads.filter(l => l.assigned_to_id === activeUser.id);
+      filteredTasks = fetchedTasks.filter(t => t.assigned_to_id === activeUser.id);
+    }
+    
+    setLeads(filteredLeads);
+    setTasks(filteredTasks);
     setLoading(false);
   };
 
