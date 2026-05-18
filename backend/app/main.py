@@ -26,14 +26,23 @@ def run_migrations():
             raw_conn.autocommit = True
             cursor = raw_conn.cursor()
             
+            # Consultar os valores existentes fisicamente no enum
+            cursor.execute("""
+                SELECT enumlabel 
+                FROM pg_enum 
+                JOIN pg_type ON pg_enum.enumtypid = pg_type.oid 
+                WHERE pg_type.typname = 'leadstatusenum';
+            """)
+            existing_statuses = {row[0] for row in cursor.fetchall()}
+            print(f"[MIGRATION] Statuses existentes no enum do PostgreSQL: {existing_statuses}")
+            
             new_statuses = ["novo", "qualificacao", "distribuido", "venda_realizada", "venda_perdida"]
             for status in new_statuses:
-                try:
+                if status not in existing_statuses:
+                    print(f"[MIGRATION] Status '{status}' está ausente. Adicionando ao enum 'leadstatusenum'...")
                     cursor.execute(f"ALTER TYPE leadstatusenum ADD VALUE '{status}'")
-                    print(f"[MIGRATION] Status '{status}' adicionado ao enum 'leadstatusenum'!")
-                except Exception as e:
-                    # Se o status já existir, o psycopg2 levanta uma exceção indicando duplicata, podemos ignorar com segurança
-                    pass
+                    print(f"[MIGRATION] Status '{status}' adicionado com sucesso!")
+                    
             cursor.close()
             raw_conn.close()
         except Exception as err:

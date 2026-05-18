@@ -198,15 +198,18 @@ def fetch_unread_emails():
                             
                         except Exception as db_err:
                             logger.error(f"Erro ao salvar lead no banco: {db_err}")
-                            # Registrar Log de Erro no Banco
-                            log_entry = models.SystemLog(
-                                log_type="ERROR",
-                                source="IMAP_READER",
-                                message=f"Erro ao gravar lead '{ai_data.name}' no banco: {db_err}"
-                            )
-                            db.add(log_entry)
-                            db.commit()
-                            db.rollback()
+                            try:
+                                db.rollback()
+                                # Registrar Log de Erro no Banco
+                                log_entry = models.SystemLog(
+                                    log_type="ERROR",
+                                    source="IMAP_READER",
+                                    message=f"Erro ao gravar lead '{ai_data.name}' no banco: {db_err}"
+                                )
+                                db.add(log_entry)
+                                db.commit()
+                            except Exception as log_err:
+                                logger.error(f"Erro secundário ao salvar log de erro no banco: {log_err}")
                         finally:
                             db.close()
                     else:
