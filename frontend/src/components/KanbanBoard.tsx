@@ -158,7 +158,9 @@ export function KanbanBoard() {
             <div className={`p-4 border-t-4 ${col.color} bg-card rounded-t-xl border-b border-border flex justify-between items-center shadow-sm`}>
               <div className="flex items-center space-x-2">
                 <h3 className="font-semibold text-sm text-foreground/90">{col.title}</h3>
-                <Info size={14} className="text-foreground/30 hover:text-primary transition-colors cursor-help" title={col.help} />
+                <span title={col.help} className="cursor-help flex items-center">
+                  <Info size={14} className="text-foreground/30 hover:text-primary transition-colors" />
+                </span>
               </div>
               <span className="text-xs text-foreground/50 font-normal">
                 {colLeads.length}
