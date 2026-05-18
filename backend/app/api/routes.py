@@ -14,7 +14,21 @@ router = APIRouter()
 
 @router.get("/leads", response_model=List[crm.LeadResponse], tags=["Leads"])
 def get_leads(db: Session = Depends(get_db)):
-    """Busca todos os leads."""
+    """Busca todos os leads e realiza o auto-arquivamento de leads inativos."""
+    # Auto-Arquivamento (Zero Cost - sem CRON)
+    threshold_date = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=7)
+    
+    leads_to_archive = db.query(models.Lead).filter(
+        models.Lead.status.in_([models.LeadStatusEnum.venda_realizada, models.LeadStatusEnum.venda_perdida]),
+        models.Lead.is_archived == False,
+        models.Lead.updated_at < threshold_date
+    ).all()
+    
+    if leads_to_archive:
+        for l in leads_to_archive:
+            l.is_archived = True
+        db.commit()
+
     return db.query(models.Lead).order_by(models.Lead.created_at.desc()).all()
 
 @router.post("/leads", response_model=crm.LeadResponse, tags=["Leads"], status_code=status.HTTP_201_CREATED)

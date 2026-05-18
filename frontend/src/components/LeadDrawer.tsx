@@ -19,6 +19,8 @@ export function LeadDrawer({ isOpen, onClose, lead, onLeadUpdated }: LeadDrawerP
   const [createFollowUp, setCreateFollowUp] = useState(false);
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
+  const currentUser = typeof window !== 'undefined' ? api.getCurrentUser() : null;
+  const isGestor = currentUser && currentUser.role !== 'vendedor';
 
   // Estados dos campos de edição do lead (cópia local para edição)
   const [formData, setFormData] = useState<Partial<Lead>>({});
@@ -263,8 +265,8 @@ export function LeadDrawer({ isOpen, onClose, lead, onLeadUpdated }: LeadDrawerP
                 <option value="novo">Leads Novos</option>
                 <option value="qualificacao">Qualificação</option>
                 <option value="distribuido">Distribuído</option>
-                <option value="venda_realizada">Venda Realizada</option>
-                <option value="venda_perdida">Venda Perdida</option>
+                <option value="venda_realizada" disabled>Venda Realizada (Arraste no Kanban)</option>
+                <option value="venda_perdida" disabled>Venda Perdida (Arraste no Kanban)</option>
               </select>
             </div>
           </div>
@@ -697,16 +699,12 @@ export function LeadDrawer({ isOpen, onClose, lead, onLeadUpdated }: LeadDrawerP
                     <Archive size={13} className="mr-1 text-red-500"/> Motivo da Perda (Se aplicável)
                   </label>
                   <select 
-                    value={formData.loss_reason}
-                    onChange={(e) => handleFieldChange('loss_reason', e.target.value)}
-                    className="w-full bg-background border border-border rounded-lg p-2.5 text-sm text-foreground/80 outline-none focus:border-primary"
+                    disabled
+                    value={formData.loss_reason || ''}
+                    className="w-full bg-foreground/5 border border-border rounded-lg p-2.5 text-sm text-foreground/50 outline-none cursor-not-allowed"
                   >
                     <option value="">Nenhum / Ativo</option>
-                    <option value="preço">Preço / Concorrência de Valores</option>
-                    <option value="prazo_entrega">Prazo de Entrega Insatisfatório</option>
-                    <option value="concorrência">Perdido para Outra Concessionária</option>
-                    <option value="crédito_negado">Crédito Negado na Instituição</option>
-                    <option value="desistência">Desistência de Compra pelo Cliente</option>
+                    <option value={formData.loss_reason || ''}>{formData.loss_reason}</option>
                   </select>
                 </div>
 
@@ -717,7 +715,9 @@ export function LeadDrawer({ isOpen, onClose, lead, onLeadUpdated }: LeadDrawerP
                   <select 
                     value={formData.assigned_to_id || ''}
                     onChange={(e) => handleFieldChange('assigned_to_id', e.target.value || null)}
-                    className="w-full bg-background border border-border rounded-lg p-2.5 text-sm text-foreground/80 outline-none focus:border-primary"
+                    disabled={!isGestor}
+                    title={!isGestor ? 'Apenas gerentes podem alterar o responsável.' : ''}
+                    className={`w-full bg-background border border-border rounded-lg p-2.5 text-sm outline-none focus:border-primary ${!isGestor ? 'opacity-70 cursor-not-allowed' : 'text-foreground/80'}`}
                   >
                     <option value="">Sem vendedor (Fila Geral)</option>
                     {users.map(u => (
