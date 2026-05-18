@@ -75,7 +75,7 @@ def fetch_unread_emails():
                     )
                     
                     if not is_lead:
-                        print(f"⏩ E-mail ignorado: não atende aos critérios de assunto de Leads comercial.")
+                        print(f"[SKIP] E-mail ignorado: não atende aos critérios de assunto de Leads comercial.")
                         # Registrar Log de E-mail Ignorado no Banco
                         db_log = SessionLocal()
                         try:
@@ -141,7 +141,7 @@ def fetch_unread_emails():
                             db.add(log_entry)
                             
                             db.commit()
-                            print(f"✅ Lead '{ai_data.name}' criado via IMAP com sucesso.")
+                            print(f"[SUCCESS] Lead '{ai_data.name}' criado via IMAP com sucesso.")
                             
                         except Exception as db_err:
                             logger.error(f"Erro ao salvar lead no banco: {db_err}")

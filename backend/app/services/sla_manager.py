@@ -28,7 +28,7 @@ def check_sla_violations():
         ).all()
         
         for lead in violating_leads:
-            logger.warning(f"🚨 SLA violado para o lead: {lead.name} (Criado em: {lead.created_at})")
+            logger.warning(f"[SLA] SLA violado para o lead: {lead.name} (Criado em: {lead.created_at})")
             
             # Atualiza o nível de urgência
             lead.urgency_level = 'SLA Atrasado'
@@ -37,7 +37,7 @@ def check_sla_violations():
             sla_activity = models.Activity(
                 lead_id=lead.id,
                 activity_type=models.ActivityTypeEnum.alerta_sla,
-                content=f"⚠️ ALERTA DE SLA: Este lead excedeu o limite de {SLA_HOURS_THRESHOLD} horas sem contato inicial."
+                content=f"ALERTA DE SLA: Este lead excedeu o limite de {SLA_HOURS_THRESHOLD} horas sem contato inicial."
             )
             db.add(sla_activity)
             
@@ -47,7 +47,7 @@ def check_sla_violations():
                 urgente_task = models.Task(
                     lead_id=lead.id,
                     assigned_to_id=vendedor_id,
-                    title="🚨 LIGAR URGENTE: SLA Vencido!",
+                    title="LIGAR URGENTE: SLA Vencido!",
                     description=f"O lead '{lead.name}' está há mais de {SLA_HOURS_THRESHOLD} horas aguardando retorno.",
                     due_date=now + timedelta(minutes=30), # Vendedor tem 30 minutos para matar essa pendência
                     task_type='ligacao'
