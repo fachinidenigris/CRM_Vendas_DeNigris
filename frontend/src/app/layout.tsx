@@ -4,7 +4,7 @@ import './globals.css';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Terminal, Kanban, Calendar, Shield, User, RefreshCw, UserCheck, Lock, Mail, Key, LogOut, Eye, EyeOff } from 'lucide-react';
+import { Users, Terminal, Kanban, Calendar, Shield, User, RefreshCw, UserCheck, Lock, Mail, Key, LogOut, Eye, EyeOff, Archive } from 'lucide-react';
 import { api, User as UserType } from '@/lib/api';
 
 export default function RootLayout({
@@ -383,6 +383,18 @@ export default function RootLayout({
                 >
                   <Kanban size={18} />
                   <span>Kanban</span>
+                </Link>
+
+                <Link 
+                  href="/historico" 
+                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    pathname === '/historico' 
+                      ? 'bg-primary text-primary-foreground shadow-sm' 
+                      : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
+                  }`}
+                >
+                  <Archive size={18} />
+                  <span>Histórico / Arquivados</span>
                 </Link>
 
                 {/* Link: Equipes & Usuários (Indisponível para Vendedor) */}

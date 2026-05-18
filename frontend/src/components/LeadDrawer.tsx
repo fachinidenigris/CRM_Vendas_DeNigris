@@ -186,10 +186,11 @@ export function LeadDrawer({ isOpen, onClose, lead, onLeadUpdated }: LeadDrawerP
             <div className="flex items-center space-x-2 mt-3">
               <button 
                 onClick={handleSendToWhatsApp}
+                title="Gera um resumo executivo do Lead e abre no WhatsApp para enviar ao Vendedor"
                 className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-[10px] px-3 py-1.5 rounded-lg transition-colors flex items-center shadow-sm uppercase tracking-wider"
               >
                 <Send size={11} className="mr-1.5" />
-                WhatsApp Vendedor
+                Enviar Repasse via WhatsApp
               </button>
             </div>
           </div>
