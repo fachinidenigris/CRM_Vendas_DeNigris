@@ -245,9 +245,11 @@ export function KanbanBoard() {
                         <div className="flex text-foreground/40 items-center space-x-1 text-[10px]" title="Tempo sem atualização">
                           <Clock size={11} />
                           <span>
-                            {Math.floor((new Date().getTime() - new Date(lead.updated_at).getTime()) / (1000 * 3600 * 24)) === 0 
-                              ? 'Hoje' 
-                              : `${Math.floor((new Date().getTime() - new Date(lead.updated_at).getTime()) / (1000 * 3600 * 24))} d atrás`}
+                            {(() => {
+                              const updatedAt = lead.updated_at || lead.created_at || new Date().toISOString();
+                              const diffDays = Math.floor((new Date().getTime() - new Date(updatedAt).getTime()) / (1000 * 3600 * 24));
+                              return diffDays <= 0 ? 'Hoje' : `${diffDays} d atrás`;
+                            })()}
                           </span>
                         </div>
                       </div>
