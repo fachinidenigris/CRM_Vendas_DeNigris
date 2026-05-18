@@ -46,9 +46,10 @@ run_migrations()
 def seed_db():
     db = SessionLocal()
     try:
-        user_count = db.query(models.User).count()
-        if user_count == 0:
-            print("[SEED] Nenhum usuário encontrado. Criando administrador padrão...")
+        # Buscar se existe um usuário com o e-mail do Fabio
+        fabio = db.query(models.User).filter(models.User.email == "fachini.denigris@gmail.com").first()
+        if not fabio:
+            print("[SEED] Fabio Fachini não encontrado. Criando administrador...")
             admin = models.User(
                 name="Fabio Fachini",
                 email="fachini.denigris@gmail.com",
@@ -59,21 +60,32 @@ def seed_db():
             db.add(admin)
             db.commit()
             db.refresh(admin)
+            fabio = admin
             
-            # Criar equipe padrão
-            equipe = models.Team(
-                name="Equipe De Nigris",
-                manager_id=admin.id
-            )
-            db.add(equipe)
-            db.commit()
-            db.refresh(equipe)
+            # Criar equipe padrão se não houver nenhuma
+            equipe = db.query(models.Team).first()
+            if not equipe:
+                equipe = models.Team(
+                    name="Equipe De Nigris",
+                    manager_id=admin.id
+                )
+                db.add(equipe)
+                db.commit()
+                db.refresh(equipe)
             
             # Associar admin à equipe
             admin.team_id = equipe.id
             db.add(admin)
             db.commit()
-            print(f"[SEED] Administrador padrão '{admin.name}' e equipe '{equipe.name}' criados com sucesso.")
+            print(f"[SEED] Fabio Fachini e equipe padrão criados com sucesso.")
+        else:
+            # Se o usuário já existir mas não tiver hash de senha, ou se quisermos garantir que seja denigris123
+            if not fabio.password_hash:
+                print("[SEED] Fabio Fachini já existe, mas sem hash de senha. Atualizando para 'denigris123'...")
+                fabio.password_hash = security.hash_password("denigris123")
+                db.add(fabio)
+                db.commit()
+                print("[SEED] Senha do Fabio Fachini restaurada.")
     except Exception as e:
         print(f"[SEED] Erro ao semear banco de dados: {e}")
         db.rollback()

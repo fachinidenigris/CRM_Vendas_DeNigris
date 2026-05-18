@@ -4,7 +4,7 @@ import './globals.css';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Terminal, Kanban, Calendar, Shield, User, RefreshCw, UserCheck, Lock, Mail, Key, LogOut } from 'lucide-react';
+import { Users, Terminal, Kanban, Calendar, Shield, User, RefreshCw, UserCheck, Lock, Mail, Key, LogOut, Eye, EyeOff } from 'lucide-react';
 import { api, User as UserType } from '@/lib/api';
 
 export default function RootLayout({
@@ -22,6 +22,8 @@ export default function RootLayout({
   const [loginPassword, setLoginPassword] = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showForgotModal, setShowForgotModal] = useState(false);
 
   // Carregar os usuários do backend e validar a sessão atual
   const loadSession = async () => {
@@ -190,18 +192,32 @@ export default function RootLayout({
                   <label className="text-[10px] uppercase font-bold text-foreground/50 tracking-wider flex items-center">
                     <Key className="inline mr-1" size={10} /> Senha de Acesso
                   </label>
-                  <span className="text-[10px] text-foreground/35 font-medium hover:text-primary transition-colors cursor-help" title="A senha padrão inicial para usuários novos/semeados é: denigris123">
+                  <button
+                    type="button"
+                    onClick={() => setShowForgotModal(true)}
+                    className="text-[10px] text-foreground/35 font-medium hover:text-primary transition-colors cursor-pointer bg-transparent border-none outline-none"
+                  >
                     Esqueceu a senha?
-                  </span>
+                  </button>
                 </div>
-                <input 
-                  type="password" 
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••••••"
-                  required
-                  className="w-full bg-[#080E1C] border border-border/40 focus:border-primary/60 rounded-xl px-4.5 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all"
-                />
+                <div className="relative">
+                  <input 
+                    type={showPassword ? "text" : "password"} 
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••••••"
+                    required
+                    className="w-full bg-[#080E1C] border border-border/40 focus:border-primary/60 rounded-xl pl-4.5 pr-12 py-3 text-sm focus:ring-2 focus:ring-primary/20 outline-none text-foreground transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-foreground/45 hover:text-foreground/85 transition-colors p-1 bg-transparent border-none outline-none cursor-pointer"
+                    title={showPassword ? "Ocultar Senha" : "Mostrar Senha"}
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
               </div>
 
               <button 
@@ -225,6 +241,33 @@ export default function RootLayout({
               </span>
             </div>
           </div>
+
+          {/* Modal Esqueceu a Senha */}
+          {showForgotModal && (
+            <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in duration-200">
+              <div className="bg-[#0e1726] border border-border/55 p-6 rounded-2xl max-w-sm w-full shadow-[0_20px_50px_rgba(0,0,0,0.5)] space-y-4 animate-in zoom-in-95 duration-200">
+                <div className="flex items-center space-x-3 text-primary">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Lock size={20} className="text-white" />
+                  </div>
+                  <h3 className="font-bold text-lg text-white">Esqueceu sua senha?</h3>
+                </div>
+                <p className="text-xs text-slate-300 leading-relaxed">
+                  Para garantir a segurança e a conformidade do CRM comercial De Nigris, redefinições de senha devem ser solicitadas diretamente à <strong>Diretoria Geral (Fabio Fachini)</strong> ou à TI da De Nigris.
+                </p>
+                <div className="bg-[#080e1c] p-3 rounded-lg border border-border/40 text-[11px] text-slate-400 leading-relaxed font-mono">
+                  Contato de Suporte: <span className="text-primary font-semibold">fachini.denigris@gmail.com</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowForgotModal(false)}
+                  className="w-full bg-primary hover:bg-primary/95 text-white font-semibold text-xs py-2.5 rounded-xl transition-all cursor-pointer border-none outline-none"
+                >
+                  Entendido, voltar
+                </button>
+              </div>
+            </div>
+          )}
         </body>
       </html>
     );
