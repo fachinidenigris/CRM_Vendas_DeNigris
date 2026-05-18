@@ -16,8 +16,11 @@ class Settings(BaseSettings):
     EMAIL_USER: Optional[str] = None
     EMAIL_APP_PASSWORD: Optional[str] = None
     
-    # Security (JWT handled by Supabase, but we can have local secrets if needed)
+    # Security
     SECRET_KEY: str = "super-secret-key-for-local-dev-only"
+    
+    # Client App URL
+    FRONTEND_URL: str = "http://localhost:3000"
 
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True)
 

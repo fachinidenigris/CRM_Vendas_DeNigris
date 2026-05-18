@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.orm import Session
 from typing import List
 from uuid import UUID
@@ -7,6 +7,7 @@ from app.db.database import get_db
 from app.db import models
 from app.schemas import crm
 from app.core import security
+from app.core.email import send_reset_password_email
 
 router = APIRouter()
 
@@ -220,6 +221,35 @@ def login(login_in: crm.UserLogin, db: Session = Depends(get_db)):
         "token_type": "bearer",
         "user": user
     }
+
+@router.post("/forgot-password", tags=["Authentication"])
+def forgot_password(payload: crm.ForgotPassword, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Inicia o fluxo de redefinição enviando um e-mail com token temporário."""
+    user = db.query(models.User).filter(models.User.email == payload.email).first()
+    if not user:
+        return {"msg": "Se o e-mail existir, um link de recuperação foi enviado."}
+        
+    token = security.create_access_token(user.id, expires_delta=datetime.timedelta(hours=1))
+    
+    # Envio assíncrono para não travar a resposta HTTP
+    background_tasks.add_task(send_reset_password_email, user.email, token)
+    return {"msg": "Se o e-mail existir, um link de recuperação foi enviado."}
+
+@router.post("/reset-password", tags=["Authentication"])
+def reset_password(payload: crm.ResetPassword, db: Session = Depends(get_db)):
+    """Redefine a senha do usuário utilizando o token validado."""
+    user_id_str = security.decode_access_token(payload.token)
+    if not user_id_str:
+        raise HTTPException(status_code=400, detail="Token expirado ou inválido")
+        
+    user_id = UUID(user_id_str)
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuário não encontrado")
+        
+    user.password_hash = security.hash_password(payload.new_password)
+    db.commit()
+    return {"msg": "Senha redefinida com sucesso."}
 
 @router.post("/users", response_model=crm.UserResponse, tags=["Users"], status_code=status.HTTP_201_CREATED)
 def create_user(user_in: crm.UserCreate, db: Session = Depends(get_db)):

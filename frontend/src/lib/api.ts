@@ -409,5 +409,33 @@ export const api = {
       console.error(err);
       throw err;
     }
+  },
+
+  forgotPassword: async (email: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_URL}/forgot-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      });
+      return res.ok;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
+  },
+
+  resetPassword: async (token: string, new_password: string): Promise<boolean> => {
+    try {
+      const res = await fetch(`${API_URL}/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token, new_password })
+      });
+      return res.ok;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
   }
 };

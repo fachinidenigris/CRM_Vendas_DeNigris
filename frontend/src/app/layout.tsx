@@ -24,6 +24,9 @@ export default function RootLayout({
   const [loginError, setLoginError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showForgotModal, setShowForgotModal] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotLoading, setForgotLoading] = useState(false);
+  const [forgotSent, setForgotSent] = useState(false);
 
   // Carregar os usuários do backend e validar a sessão atual
   const loadSession = async () => {
@@ -80,6 +83,15 @@ export default function RootLayout({
     } finally {
       setLoginLoading(false);
     }
+  };
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim()) return;
+    setForgotLoading(true);
+    await api.forgotPassword(forgotEmail.trim());
+    setForgotLoading(false);
+    setForgotSent(true);
   };
 
   const handleLogout = () => {
@@ -252,19 +264,61 @@ export default function RootLayout({
                   </div>
                   <h3 className="font-bold text-lg text-white">Esqueceu sua senha?</h3>
                 </div>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Para garantir a segurança e a conformidade do CRM comercial De Nigris, redefinições de senha devem ser solicitadas diretamente à <strong>Diretoria Geral (Fabio Fachini)</strong> ou à TI da De Nigris.
-                </p>
-                <div className="bg-[#080e1c] p-3 rounded-lg border border-border/40 text-[11px] text-slate-400 leading-relaxed font-mono">
-                  Contato de Suporte: <span className="text-primary font-semibold">fachini.denigris@gmail.com</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setShowForgotModal(false)}
-                  className="w-full bg-primary hover:bg-primary/95 text-white font-semibold text-xs py-2.5 rounded-xl transition-all cursor-pointer border-none outline-none"
-                >
-                  Entendido, voltar
-                </button>
+                
+                {forgotSent ? (
+                  <div className="space-y-4">
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-4 rounded-xl text-center">
+                      <p className="text-sm text-emerald-400 font-medium">Link enviado com sucesso!</p>
+                      <p className="text-xs text-slate-300 mt-2">Verifique sua caixa de entrada e a pasta de spam. O link é válido por 1 hora.</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotModal(false);
+                        setForgotSent(false);
+                        setForgotEmail('');
+                      }}
+                      className="w-full bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-3 rounded-xl transition-all cursor-pointer border border-border/40 outline-none"
+                    >
+                      Voltar ao Login
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleForgotPassword} className="space-y-4">
+                    <p className="text-xs text-slate-300 leading-relaxed text-center px-2">
+                      Digite seu e-mail corporativo abaixo. Você receberá um link seguro para redefinir sua senha.
+                    </p>
+                    
+                    <div className="relative">
+                      <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 z-10" />
+                      <input 
+                        type="email"
+                        required
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="seu.email@denigris.com.br"
+                        className="w-full bg-[#080e1c]/80 border border-border/40 rounded-xl py-3 pl-10 pr-4 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all backdrop-blur-sm"
+                      />
+                    </div>
+
+                    <div className="flex space-x-3 pt-2">
+                      <button
+                        type="button"
+                        onClick={() => setShowForgotModal(false)}
+                        className="flex-1 bg-transparent hover:bg-white/5 text-slate-300 font-semibold text-xs py-3 rounded-xl transition-all cursor-pointer border border-border/40 outline-none"
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="submit"
+                        disabled={forgotLoading}
+                        className="flex-1 bg-primary hover:bg-primary/95 disabled:opacity-50 text-white font-semibold text-xs py-3 rounded-xl transition-all cursor-pointer border-none outline-none shadow-lg shadow-primary/20"
+                      >
+                        {forgotLoading ? 'Enviando...' : 'Enviar Link'}
+                      </button>
+                    </div>
+                  </form>
+                )}
               </div>
             </div>
           )}
