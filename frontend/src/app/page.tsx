@@ -22,7 +22,6 @@ export default function Home() {
     company: '',
     product_interest: '',
     city_region: '',
-    city_region: '',
     source: 'Cadastro Manual',
     status: 'novo',
     urgency_level: 'Normal',
