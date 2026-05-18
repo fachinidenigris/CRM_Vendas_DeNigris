@@ -29,6 +29,7 @@ export interface Lead {
   phone: string | null;
   company: string | null;
   product_interest: string | null;
+  city_region: string | null;
   source: string;
   status: string;
   urgency_level: string | null;
