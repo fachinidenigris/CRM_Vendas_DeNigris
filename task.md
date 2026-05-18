@@ -13,5 +13,10 @@ Este arquivo registra e rastreia o andamento de todas as tarefas comerciais e t�
 | 3 | Consistência de Funil Simplificado e SLA | ✅ Concluído | 18/05/2026 | 18/05/2026 | Ajustada a rotina do SLA para englobar os novos status de funil (`novo`, `distribuido`). |
 | 4 | Blindagem de Rotas JWT & Isolamento SQL (RLS) | ✅ Concluído | 18/05/2026 | 18/05/2026 | Enforced JWT no backend com filtros automáticos por perfil comercial e centralizado no securedFetch. |
 | 5 | Kanban Touch Mobile & Notificações Toast | ✅ Concluído | 18/05/2026 | 18/05/2026 | Adicionado menu dropdown touch em cards Kanban e linda biblioteca nativa de Toasts. |
-| 6 | Deploy e Sincronização de Repositório Git | ✅ Concluído | 18/05/2026 | 18/05/2026 | Pushed commit `b534206` com sucesso para o GitHub fachinidenigris/CRM_Vendas_DeNigris. |
-| 7 | Criação das Habilidades e Workflow de Tasks | ✅ Concluído | 18/05/2026 | 18/05/2026 | Criados os arquivos habilidade.md e task.md formalizando o ciclo de desenvolvimento solicitado pelo usuário. |
+| 6 | Deploy e Sincronização de Repositório Git | ✅ Concluído | 18/05/2026 | 18/05/2026 | Pushed commit `b534206` com sucesso para o GitHub. |
+| 7 | Migração e Alinhamento de Leads do Kanban | ✅ Concluído | 18/05/2026 | 18/05/2026 | Criadas colunas ausentes no banco SQLite (`is_archived`, etc.) e migrados status legados para exibição imediata no funil. |
+| 8 | Tela Agenda/Hoje: Visão Calendário | ✅ Concluído | 18/05/2026 | 18/05/2026 | Implementado planejador de produtividade diária navegável (horizontal week strip + datepicker). |
+| 9 | Coluna de Tarefas Feitas na Agenda | ✅ Concluído | 18/05/2026 | 18/05/2026 | Adicionado layout responsivo de 4 colunas com seção de tarefas concluídas por data para auditoria do gestor. |
+| 10 | Kanban: Correção do Scroll Lateral | ✅ Concluído | 18/05/2026 | 18/05/2026 | Corrigido scroll lateral do Kanban aplicando h-[calc(100vh-190px)] no board e rolagem independente h-full/overflow-y nas colunas. |
+| 11 | Histórico/Arquivos: Filtro de Período | ✅ Concluído | 18/05/2026 | 18/05/2026 | Adicionado seletor e filtro de período (Hoje, Esta Semana, Este Mês) no Histórico de Fechamentos. |
+| 12 | Telas de Relatórios (Analytics) & Marketing | ✅ Concluído | 18/05/2026 | 18/05/2026 | Criadas as novas telas e implementada a integração completa dos módulos de Relatórios Comerciais e Automação de Marketing com a barra de navegação principal. |

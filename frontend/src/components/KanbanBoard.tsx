@@ -169,7 +169,7 @@ export function KanbanBoard() {
   };
 
   return (
-    <div className="flex h-full min-h-[600px] space-x-4 overflow-x-auto pb-6 select-none relative">
+    <div className="flex h-[calc(100vh-190px)] min-h-[500px] space-x-4 overflow-x-auto pb-6 select-none relative">
       {COLUMNS.map((col) => {
         const colLeads = leads.filter(l => l.status === col.id);
         const isOver = dragOverColumn === col.id;
@@ -180,7 +180,7 @@ export function KanbanBoard() {
             onDragOver={(e) => handleDragOver(e, col.id)}
             onDrop={(e) => handleDrop(e, col.id)}
             onDragLeave={() => setDragOverColumn(null)}
-            className={`flex flex-col min-w-[320px] w-[320px] rounded-xl border transition-all duration-200 ${
+            className={`flex flex-col min-w-[320px] w-[320px] h-full rounded-xl border transition-all duration-200 ${
               isOver ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : 'border-border bg-foreground/5'
             }`}
           >
@@ -197,8 +197,8 @@ export function KanbanBoard() {
               </span>
             </div>
 
-            {/* Área de Cards */}
-            <div className="flex-1 p-3 space-y-3 overflow-y-auto min-h-[480px]">
+            {/* Área de Cards (rolagem vertical interna independente) */}
+            <div className="flex-1 p-3 space-y-3 overflow-y-auto">
               {colLeads.map((lead) => {
                 const leadTags = lead.tags ? lead.tags.split(',') : [];
                 return (

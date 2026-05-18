@@ -105,43 +105,117 @@ export default function Home() {
     );
   }
 
-  // Filtragem dos dados (Foco Operacional Extremo)
-  
-  // 1. Leads novos de alta urgência ou tarefas não concluídas e atrasadas
-  // 1. Leads novos de alta urgência ou tarefas não concluídas e atrasadas
+  // 1. Controle de Data Selecionada para a Agenda / Calendário
+  const [selectedDate, setSelectedDate] = useState<string>(new Date().toISOString().split('T')[0]);
+
+  // Função utilitária para gerar a faixa de 7 dias centralizada em hoje
+  const getWeekDays = () => {
+    const start = new Date();
+    const days = [];
+    for (let i = -3; i <= 3; i++) {
+      const d = new Date();
+      d.setDate(start.getDate() + i);
+      days.push({
+        dateStr: d.toISOString().split('T')[0],
+        dayNum: d.getDate(),
+        dayLabel: d.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '').toUpperCase(),
+        isToday: d.toDateString() === new Date().toDateString()
+      });
+    }
+    return days;
+  };
+
+  // Filtragem dos dados baseada na data selecionada (Foco Operacional e Auditoria de Gestão)
   const now = new Date();
-  const overdueTasks = tasks.filter(t => !t.is_completed && new Date(t.due_date) < now);
-  const urgentLeads = leads.filter(l => l.status === 'novo' && l.urgency_level === 'Alta');
   
-  // 2. Tarefas marcadas para hoje (ou pendentes gerais)
-  const todayTasks = tasks.filter(t => {
+  // 1. Leads novos de alta urgência
+  const urgentLeads = leads.filter(l => l.status === 'novo' && l.urgency_level === 'Alta');
+
+  // 2. Tarefas Agendadas (Planejadas e Pendentes para a data selecionada)
+  const selectedDateTasks = tasks.filter(t => {
     if (t.is_completed) return false;
-    const taskDate = new Date(t.due_date);
-    return taskDate.toDateString() === now.toDateString() || taskDate > now; // Hoje ou futuras pendentes
+    const taskDate = new Date(t.due_date).toISOString().split('T')[0];
+    return taskDate === selectedDate;
   });
 
-  // 3. Todos os Novos Leads (etapa inicial do funil)
-  // 3. Todos os Novos Leads (etapa inicial do funil)
+  // 3. Tarefas Concluídas (Feitas na data selecionada - perfeito para auditoria do gestor)
+  const completedTasks = tasks.filter(t => {
+    if (!t.is_completed) return false;
+    const taskDate = new Date(t.due_date).toISOString().split('T')[0];
+    return taskDate === selectedDate;
+  });
+
+  // 4. Tarefas Atrasadas / Vencidas em relação ao dia selecionado
+  const overdueTasks = tasks.filter(t => {
+    if (t.is_completed) return false;
+    const taskDate = new Date(t.due_date).toISOString().split('T')[0];
+    return taskDate < selectedDate;
+  });
+
+  // 5. Todos os Novos Leads (etapa inicial do funil)
   const newLeads = leads.filter(l => l.status === 'novo');
 
   return (
     <div className="space-y-6">
-      <header className="flex items-center justify-between pb-4 border-b border-border">
+      <header className="flex flex-col md:flex-row md:items-center justify-between pb-4 border-b border-border gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Agenda Operacional</h2>
-          <p className="text-foreground/60 mt-1">Sua visão geral de produtividade diária sem atritos.</p>
+          <p className="text-foreground/60 mt-1">Sua visão geral de produtividade diária e auditoria sem atritos.</p>
         </div>
-        <div className="flex space-x-2">
-          <button onClick={() => setIsModalOpen(true)} className="bg-primary text-primary-foreground px-4 py-2 rounded-md font-medium hover:bg-primary/90 transition-colors">
+        <div className="flex space-x-2 shrink-0">
+          <button onClick={() => setIsModalOpen(true)} className="bg-primary text-primary-foreground px-4 py-2 rounded-md font-semibold hover:bg-primary/90 transition-colors shadow">
             + Novo Lead Manual
           </button>
-          <button onClick={fetchData} className="bg-foreground/5 text-foreground px-4 py-2 rounded-md font-medium hover:bg-foreground/10 transition-colors flex items-center">
+          <button onClick={fetchData} className="bg-foreground/5 text-foreground px-4 py-2 rounded-md font-medium hover:bg-foreground/10 transition-colors flex items-center border border-border">
             <RefreshCw size={16} className="mr-2" /> Atualizar
           </button>
         </div>
       </header>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      {/* Barra de Calendário Interativo / Navegador Diário */}
+      <div className="bg-card border border-border p-4 rounded-xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-sm">
+        <div className="flex items-center space-x-3">
+          <Calendar className="text-primary animate-pulse" size={24} />
+          <div>
+            <h3 className="font-bold text-sm text-foreground">Planejador de Produtividade</h3>
+            <p className="text-[11px] text-foreground/50">Selecione uma data para auditar tarefas planejadas e concluídas.</p>
+          </div>
+        </div>
+        
+        {/* Strip de Dias Centrado em Hoje */}
+        <div className="flex space-x-1.5 overflow-x-auto w-full md:w-auto pb-1 md:pb-0 select-none scrollbar-none">
+          {getWeekDays().map((day) => (
+            <button
+              key={day.dateStr}
+              onClick={() => setSelectedDate(day.dateStr)}
+              className={`flex flex-col items-center justify-center min-w-[52px] p-2 rounded-lg transition-all cursor-pointer border ${
+                selectedDate === day.dateStr
+                  ? 'bg-primary text-primary-foreground border-primary shadow-sm scale-105 font-bold'
+                  : 'bg-background hover:bg-foreground/5 border-border text-foreground/70'
+              }`}
+            >
+              <span className="text-[9px] uppercase font-bold tracking-wider leading-none mb-1">{day.dayLabel}</span>
+              <span className="text-sm font-extrabold leading-none">{day.dayNum}</span>
+              {day.isToday && (
+                <span className={`w-1 h-1 rounded-full mt-1 ${selectedDate === day.dateStr ? 'bg-primary-foreground' : 'bg-primary'}`} />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {/* Datepicker Personalizado */}
+        <div className="flex items-center space-x-2 shrink-0">
+          <span className="text-xs font-semibold text-foreground/50">Outro dia:</span>
+          <input
+            type="date"
+            value={selectedDate}
+            onChange={(e) => setSelectedDate(e.target.value)}
+            className="bg-background border border-border rounded-lg px-3 py-1.5 text-xs font-semibold text-foreground outline-none focus:ring-1 focus:ring-primary focus:border-primary cursor-pointer hover:bg-foreground/[0.02]"
+          />
+        </div>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
         {/* Coluna 1: Novos Leads */}
         <div className="space-y-4">
           <div className="flex items-center space-x-2 text-green-500 font-semibold mb-4 border-b border-border pb-2">
@@ -172,7 +246,7 @@ export default function Home() {
               )}
               
               <div className="flex items-center justify-between border-t border-border pt-3 mt-2">
-                <span className="text-xs font-medium text-foreground/60">Ação Necessária: Responder e-mail</span>
+                <span className="text-xs font-medium text-foreground/60">Ação Necessária: Responder</span>
                 <button className="flex items-center space-x-1 text-xs bg-foreground/10 hover:bg-foreground/20 px-2 py-1 rounded transition-colors">
                   <span>Abrir Ficha</span>
                 </button>
@@ -182,19 +256,19 @@ export default function Home() {
 
           {newLeads.length === 0 && (
             <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
-              Excelente! Nenhum novo lead sem resposta pendente.
+              Excelente! Nenhum novo lead pendente.
             </div>
           )}
         </div>
 
-        {/* Coluna 2: Tarefas do Dia */}
+        {/* Coluna 2: Tarefas Agendadas (Planejadas / Pendentes) */}
         <div className="space-y-4">
           <div className="flex items-center space-x-2 text-blue-500 font-semibold mb-4 border-b border-border pb-2">
             <Calendar size={20} />
-            <h3>Tarefas de Hoje / Pendentes ({todayTasks.length})</h3>
+            <h3>Agendadas ({selectedDateTasks.length})</h3>
           </div>
           
-          {todayTasks.map((task) => {
+          {selectedDateTasks.map((task) => {
             const lead = leads.find(l => l.id === task.lead_id);
             return (
               <div 
@@ -231,18 +305,64 @@ export default function Home() {
             );
           })}
 
-          {todayTasks.length === 0 && (
+          {selectedDateTasks.length === 0 && (
             <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
-              Nenhuma tarefa pendente para hoje.
+              Nenhuma tarefa agendada para esta data.
             </div>
           )}
         </div>
 
-        {/* Coluna 3: Follow-ups Atrasados / Urgentes */}
+        {/* Coluna 3: Tarefas Concluídas (Feitas na data selecionada) */}
+        <div className="space-y-4">
+          <div className="flex items-center space-x-2 text-emerald-500 font-semibold mb-4 border-b border-border pb-2">
+            <CheckCircle2 size={20} />
+            <h3>Tarefas Feitas ({completedTasks.length})</h3>
+          </div>
+          
+          {completedTasks.map((task) => {
+            const lead = leads.find(l => l.id === task.lead_id);
+            return (
+              <div 
+                key={task.id} 
+                onClick={() => lead && handleOpenLead(lead)}
+                className="bg-card border border-border/80 hover:border-emerald-500/30 rounded-lg p-4 shadow-sm opacity-80 hover:opacity-100 transition-all cursor-pointer relative"
+              >
+                <div className="flex justify-between items-start mb-2">
+                  <span className="text-xs font-semibold px-2 py-1 bg-emerald-500/10 text-emerald-500 rounded-full flex items-center">
+                    <CheckCircle2 size={12} className="mr-1"/>
+                    {task.task_type.toUpperCase()}
+                  </span>
+                  <span className="text-xs text-foreground/40">
+                    Concluído
+                  </span>
+                </div>
+                <h4 className="font-bold text-lg line-through text-foreground/50">{task.title}</h4>
+                {lead && <p className="text-sm text-foreground/50 mb-2 flex items-center"><Briefcase size={14} className="mr-1"/> {lead.company || lead.name}</p>}
+                
+                <div className="text-sm text-foreground/60 mb-3 whitespace-pre-wrap italic">
+                  {task.description}
+                </div>
+                
+                <div className="border-t border-border pt-3 mt-2 flex justify-between items-center">
+                  <span className="text-[10px] text-foreground/40 font-medium">Prazo: {new Date(task.due_date).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</span>
+                  <span className="text-[10px] font-semibold text-emerald-500 bg-emerald-500/5 px-2 py-0.5 rounded border border-emerald-500/15">Sucesso</span>
+                </div>
+              </div>
+            );
+          })}
+
+          {completedTasks.length === 0 && (
+            <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
+              Nenhuma atividade concluída nesta data.
+            </div>
+          )}
+        </div>
+
+        {/* Coluna 4: Follow-ups Atrasados / Urgentes */}
         <div className="space-y-4">
           <div className="flex items-center space-x-2 text-red-500 font-semibold mb-4 border-b border-border pb-2">
             <AlertCircle size={20} />
-            <h3>Atrasados / SLA Vencido ({overdueTasks.length + urgentLeads.length})</h3>
+            <h3>Atrasados / SLA ({overdueTasks.length + urgentLeads.length})</h3>
           </div>
           
           {urgentLeads.map((lead) => (
@@ -266,7 +386,7 @@ export default function Home() {
               )}
               
               <div className="flex items-center justify-between border-t border-border pt-3 mt-2">
-                <span className="text-xs font-medium text-foreground/60">Ação Pendente: Fazer 1º contato</span>
+                <span className="text-xs font-medium text-foreground/60">Ação: Contato Imediato</span>
                 <button className="flex items-center space-x-1 text-xs bg-foreground/10 hover:bg-foreground/20 px-2 py-1 rounded transition-colors">
                   <Phone size={12} />
                   <span>Contatar</span>
@@ -285,7 +405,7 @@ export default function Home() {
               >
                 <div className="flex justify-between items-start mb-2">
                   <span className="text-xs font-semibold px-2 py-1 bg-red-500/10 text-red-500 rounded-full flex items-center">
-                    <AlertCircle size={12} className="mr-1"/> Follow-up Atrasado
+                    <AlertCircle size={12} className="mr-1"/> Atrasada
                   </span>
                   <span className="text-xs text-red-400 font-medium">
                     {new Date(task.due_date).toLocaleDateString('pt-BR')}
@@ -296,7 +416,7 @@ export default function Home() {
                 <p className="text-sm text-foreground/60 mb-3">{task.description}</p>
                 
                 <div className="flex items-center justify-between border-t border-border pt-3 mt-2">
-                  <span className="text-xs font-medium text-foreground/60">SLA Excedido</span>
+                  <span className="text-xs font-medium text-foreground/60">Prazo Estourado</span>
                   <button 
                     onClick={(e) => handleCompleteTask(task.id, e)}
                     className="flex items-center space-x-1 text-xs bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600 transition-colors"
@@ -310,7 +430,7 @@ export default function Home() {
 
           {urgentLeads.length === 0 && overdueTasks.length === 0 && (
             <div className="text-center p-6 border border-dashed border-border rounded-lg text-foreground/40 text-sm">
-              Tudo em dia! Sem atrasos na sua fila.
+              Tudo em dia! Sem atrasos nesta data.
             </div>
           )}
         </div>

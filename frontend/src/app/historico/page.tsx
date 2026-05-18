@@ -9,6 +9,7 @@ export default function HistoricoPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterType, setFilterType] = useState('all');
+  const [periodFilter, setPeriodFilter] = useState('all');
 
   const fetchData = async () => {
     setLoading(true);
@@ -44,9 +45,31 @@ export default function HistoricoPage() {
     const matchesSearch = l.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           (l.company && l.company.toLowerCase().includes(searchTerm.toLowerCase()));
     
-    if (filterType === 'venda_realizada') return matchesSearch && l.status === 'venda_realizada';
-    if (filterType === 'venda_perdida') return matchesSearch && l.status === 'venda_perdida';
-    return matchesSearch;
+    let matchesType = true;
+    if (filterType === 'venda_realizada') matchesType = l.status === 'venda_realizada';
+    else if (filterType === 'venda_perdida') matchesType = l.status === 'venda_perdida';
+
+    let matchesPeriod = true;
+    if (periodFilter !== 'all') {
+      const dateString = l.sale_date || l.updated_at;
+      if (!dateString) {
+        matchesPeriod = false;
+      } else {
+        const date = new Date(dateString);
+        const now = new Date();
+        if (periodFilter === 'today') {
+          matchesPeriod = date.toDateString() === now.toDateString();
+        } else if (periodFilter === 'week') {
+          const oneWeekAgo = new Date();
+          oneWeekAgo.setDate(now.getDate() - 7);
+          matchesPeriod = date >= oneWeekAgo && date <= now;
+        } else if (periodFilter === 'month') {
+          matchesPeriod = date.getMonth() === now.getMonth() && date.getFullYear() === now.getFullYear();
+        }
+      }
+    }
+    
+    return matchesSearch && matchesType && matchesPeriod;
   });
 
   // Analytics Metrics
@@ -120,17 +143,32 @@ export default function HistoricoPage() {
             className="w-full bg-background border border-border rounded-lg pl-9 pr-4 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary"
           />
         </div>
-        <div className="flex items-center space-x-2">
-          <Filter size={16} className="text-foreground/40" />
-          <select 
-            value={filterType}
-            onChange={(e) => setFilterType(e.target.value)}
-            className="bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary font-medium"
-          >
-            <option value="all">Todos os Fechamentos</option>
-            <option value="venda_realizada">Apenas Vendas Realizadas</option>
-            <option value="venda_perdida">Apenas Vendas Perdidas</option>
-          </select>
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center space-x-2">
+            <Filter size={16} className="text-foreground/40" />
+            <select 
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+              className="bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary font-medium outline-none cursor-pointer"
+            >
+              <option value="all">Todos os Fechamentos</option>
+              <option value="venda_realizada">Apenas Vendas Realizadas</option>
+              <option value="venda_perdida">Apenas Vendas Perdidas</option>
+            </select>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span className="text-xs font-semibold text-foreground/50 sm:block hidden">Período:</span>
+            <select 
+              value={periodFilter}
+              onChange={(e) => setPeriodFilter(e.target.value)}
+              className="bg-background border border-border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-primary font-medium outline-none cursor-pointer"
+            >
+              <option value="all">Qualquer Período</option>
+              <option value="today">Hoje</option>
+              <option value="week">Esta Semana</option>
+              <option value="month">Este Mês</option>
+            </select>
+          </div>
         </div>
       </div>
 
