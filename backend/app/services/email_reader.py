@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 
 def connect_imap():
     try:
-        # Conecta no IMAP do Gmail
-        mail = imaplib.IMAP4_SSL("imap.gmail.com")
+        # Conecta no IMAP do Gmail com timeout de 15 segundos para evitar travamentos indefinidos
+        mail = imaplib.IMAP4_SSL("imap.gmail.com", timeout=15)
         mail.login(settings.EMAIL_USER, settings.EMAIL_APP_PASSWORD)
         return mail
     except Exception as e:
