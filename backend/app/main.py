@@ -37,19 +37,9 @@ def run_migrations():
             cursor = raw_conn.cursor()
 
             def migrate_col_to_varchar(table: str, column: str, default_val: str):
-                """Converte coluna ENUM para VARCHAR se necessário, removendo e restaurando default no PostgreSQL."""
-                cursor.execute(
-                    "SELECT data_type FROM information_schema.columns WHERE table_name=%s AND column_name=%s;",
-                    (table, column)
-                )
-                row = cursor.fetchone()
-                if not row:
-                    print(f"[MIGRATION-PG] {table}.{column} não encontrada. Pulando.")
-                    return
-                data_type = row[0]
-                print(f"[MIGRATION-PG] {table}.{column}: tipo='{data_type}'")
-                if data_type == "USER-DEFINED":
-                    print(f"[MIGRATION-PG] Convertendo {table}.{column} ENUM -> VARCHAR...")
+                """Converte coluna ENUM para VARCHAR de forma incondicional e robusta no PostgreSQL."""
+                try:
+                    print(f"[MIGRATION-PG] Convertendo {table}.{column} -> VARCHAR (incondicional)...")
                     # 1. Remover constraint CHECK de validação de ENUM do SQLAlchemy para destravar a alteração física
                     cursor.execute(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {table}_{column}_check;")
                     # 2. Remover o default antigo para evitar bloqueio de tipo
@@ -59,6 +49,9 @@ def run_migrations():
                     # 4. Adicionar o novo default como VARCHAR
                     cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT '{default_val}';")
                     print(f"[MIGRATION-PG] [SUCESSO] {table}.{column} convertida para VARCHAR!")
+                except Exception as col_err:
+                    print(f"[MIGRATION-PG] [AVISO] Falha ao converter {table}.{column}: {col_err}")
+                    raise col_err
 
             migrate_col_to_varchar("leads", "status", "novo")
             migrate_col_to_varchar("leads", "priority", "media")
