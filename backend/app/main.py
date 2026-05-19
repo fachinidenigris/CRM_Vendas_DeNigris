@@ -31,42 +31,48 @@ def run_migrations():
     if "postgresql" in str(engine.url):
         raw_conn = None
         try:
-            print("[MIGRATION-PG] Iniciando migração de ENUM -> VARCHAR no PostgreSQL...")
+            print("[MIGRATION-PG] Iniciando migração leve de ENUMs no PostgreSQL...")
             raw_conn = engine.raw_connection()
             raw_conn.autocommit = True
             cursor = raw_conn.cursor()
 
-            def migrate_col_to_varchar(table: str, column: str, default_val: str):
-                """Converte coluna ENUM para VARCHAR de forma incondicional e robusta no PostgreSQL."""
+            def add_enum_value_safe(enum_name: str, value: str):
                 try:
-                    print(f"[MIGRATION-PG] Convertendo {table}.{column} -> VARCHAR (incondicional)...")
-                    # 1. Remover constraint CHECK de validação de ENUM do SQLAlchemy para destravar a alteração física
-                    cursor.execute(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {table}_{column}_check;")
-                    # 2. Remover o default antigo para evitar bloqueio de tipo
-                    cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} DROP DEFAULT;")
-                    # 3. Converter o tipo de coluna
-                    cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR USING {column}::text;")
-                    # 4. Adicionar o novo default como VARCHAR
-                    cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT '{default_val}';")
-                    print(f"[MIGRATION-PG] [SUCESSO] {table}.{column} convertida para VARCHAR!")
-                except Exception as col_err:
-                    print(f"[MIGRATION-PG] [AVISO] Falha ao converter {table}.{column}: {col_err}")
-                    raise col_err
+                    cursor.execute(f"ALTER TYPE {enum_name} ADD VALUE IF NOT EXISTS '{value}';")
+                    print(f"[MIGRATION-PG] [SUCESSO] Valor '{value}' adicionado ao enum {enum_name} (ou já existente).")
+                except Exception as e:
+                    print(f"[MIGRATION-PG] [AVISO] Falha ao adicionar '{value}' ao enum {enum_name}: {e}")
 
-            migrate_col_to_varchar("leads", "status", "novo")
-            migrate_col_to_varchar("leads", "priority", "media")
-            migrate_col_to_varchar("tasks", "task_type", "outro")
+            # Status de Leads
+            add_enum_value_safe("leadstatusenum", "novo")
+            add_enum_value_safe("leadstatusenum", "qualificacao")
+            add_enum_value_safe("leadstatusenum", "distribuido")
+            add_enum_value_safe("leadstatusenum", "venda_realizada")
+            add_enum_value_safe("leadstatusenum", "venda_perdida")
+
+            # Prioridades
+            add_enum_value_safe("priorityenum", "baixa")
+            add_enum_value_safe("priorityenum", "media")
+            add_enum_value_safe("priorityenum", "alta")
+            add_enum_value_safe("priorityenum", "critica")
+
+            # Tipos de Tarefas
+            add_enum_value_safe("tasktypeenum", "ligacao")
+            add_enum_value_safe("tasktypeenum", "email")
+            add_enum_value_safe("tasktypeenum", "whatsapp")
+            add_enum_value_safe("tasktypeenum", "reuniao")
+            add_enum_value_safe("tasktypeenum", "outro")
 
             cursor.close()
-            print("[MIGRATION-PG] Bloco 1 concluido.")
+            print("[MIGRATION-PG] Bloco 1 leve concluido.")
         except Exception as err:
-            print(f"[MIGRATION-PG] [ERRO] Bloco 1 (ENUM->VARCHAR): {err}")
+            print(f"[MIGRATION-PG] [ERRO] Bloco 1 (ENUM leve): {err}")
             try:
                 db_log = SessionLocal()
                 log_entry = models.SystemLog(
                     log_type="ERROR",
                     source="MIGRATION_PG",
-                    message=f"Falha ao migrar ENUM->VARCHAR no Postgres: {str(err)}"
+                    message=f"Falha ao migrar ENUMs no Postgres: {str(err)}"
                 )
                 db_log.add(log_entry)
                 db_log.commit()
