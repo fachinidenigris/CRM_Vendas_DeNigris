@@ -11,68 +11,6 @@ from app.core.email import send_reset_password_email
 
 router = APIRouter()
 
-@router.get("/debug-db-status", tags=["Debug"])
-def debug_db_status(db: Session = Depends(get_db)):
-    try:
-        from sqlalchemy import text
-        # 1. Informações das colunas da tabela leads
-        col_query = text("""
-            SELECT column_name, data_type, udt_name, column_default 
-            FROM information_schema.columns 
-            WHERE table_name = 'leads' AND (table_schema = 'public' OR table_schema IS NOT NULL);
-        """)
-        cols = db.execute(col_query).fetchall()
-        cols_list = []
-        for r in cols:
-            cols_list.append({
-                "column_name": r[0],
-                "data_type": r[1],
-                "udt_name": r[2],
-                "column_default": r[3]
-            })
-
-        # 2. Informações de constraints da tabela leads
-        cons_list = []
-        try:
-            cons_query = text("""
-                SELECT conname, pg_get_constraintdef(c.oid)
-                FROM pg_constraint c
-                JOIN pg_namespace n ON n.oid = c.connamespace
-                WHERE conrelid = 'leads'::regclass;
-            """)
-            cons = db.execute(cons_query).fetchall()
-            for r in cons:
-                cons_list.append({
-                    "constraint_name": r[0],
-                    "definition": r[1]
-                })
-        except Exception as ce:
-            cons_list.append({"error": str(ce)})
-
-        # 3. Últimos 15 logs do sistema
-        logs = db.query(models.SystemLog).order_by(models.SystemLog.created_at.desc()).limit(15).all()
-        logs_list = []
-        for l in logs:
-            logs_list.append({
-                "id": str(l.id),
-                "log_type": l.log_type,
-                "source": l.source,
-                "message": l.message,
-                "created_at": l.created_at.isoformat() if l.created_at else None
-            })
-
-        return {
-            "status": "success",
-            "columns": cols_list,
-            "constraints": cons_list,
-            "logs": logs_list
-        }
-    except Exception as e:
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-
 # --- LEADS ---
 
 @router.get("/leads", response_model=List[crm.LeadResponse], tags=["Leads"])
