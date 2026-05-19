@@ -126,7 +126,8 @@ Este mapa serve como um guia de referência rápido de alta fidelidade de todos 
 5. Invoca a contingência tripla de IA (`parse_email_content`).
 6. Se a decodificação for bem-sucedida, realiza a distribuição automática:
    * **Rodízio (Round-Robin):** Distribui o lead entre os vendedores ativos (`is_paused == False`) da equipe.
-7. Grava o lead no banco de dados, marca o e-mail como lido (`\\Seen`) e gera o log de auditoria correspondente.
+7. **Status Inicial e Tags:** O status de entrada de todos os leads via e-mail é definido incondicionalmente como `novo` (Leads Novos). As tags da IA e do interesse do produto são sanitizadas pela função `sanitize_and_enrich_tags` para evitar termos repetidos (ex: "Autônomo" vs "autonomo"), remover tags como "alto potencial" na entrada (reservada para atribuição do vendedor no futuro) e enriquecer com marcas/modelos específicos (como "sprinter", "van", "caminhao").
+8. Grava o lead no banco de dados, marca o e-mail como lido (`\\Seen`) e gera o log de auditoria correspondente.
 
 ### Parser de Contingência Tripla (`backend/app/services/ai_parser.py`)
 *   **Groq API (`parse_with_groq`):** Principal provedor de nuvem. Modelo `llama-3.1-8b-instant`.
@@ -138,8 +139,9 @@ Este mapa serve como um guia de referência rápido de alta fidelidade de todos 
 ## 🖥️ 5. Mapeamento de Telas do Frontend
 
 *   **Agenda / Hoje (`src/app/page.tsx`):** Exibe as tarefas pendentes do dia e cards rápidos de desempenho do vendedor.
-*   **Kanban (`src/app/kanban/page.tsx`):** Quadro interativo dividido em colunas (`novo` ➔ `qualificacao` ➔ `distribuido` ➔ `venda_realizada`). Permite mover leads entre etapas via drag-and-drop e disparar a gaveta lateral (`LeadDrawer`) ao clicar no lead.
+*   **Kanban (`src/app/kanban/page.tsx` & `src/components/KanbanBoard.tsx`):** Quadro interativo dividido em colunas (`novo` ➔ `qualificacao` ➔ `distribuido` ➔ `venda_realizada`). Possui campo de **busca global rápida** (nome, e-mail, celular, veículo) e **tooltips dinâmicos informativos** em cada coluna (ícone "i"). Os cards de lead são encolhidos visualmente (removendo prioridades e tags extras) para melhor aproveitamento do espaço em tela.
 *   **Histórico / Fechamentos (`src/app/historico/page.tsx`):** Tabela de leads fechados (`venda_realizada` ou `venda_perdida`). Exibe estatísticas de conversão e permite buscar propostas e arquivos anexos vinculados.
 *   **Relatórios (`src/app/relatorios/page.tsx`):** Dashboard gerencial com gráficos de taxas de conversão de leads por vendedor, vendas por categoria e motivos de perda.
 *   **Automação de Marketing (`src/app/marketing/page.tsx`):** Módulo de simulação (Beta) de envios automatizados de campanhas por e-mail e SMS para leads cadastrados.
 *   **Visualizador de Logs (`src/app/logs/page.tsx`):** Tela administrativa que permite visualizar as atividades do robô de e-mails em tempo real.
+*   **Settings (`src/app/settings/page.tsx`):** Tela de gerenciamento de equipe e perfil..

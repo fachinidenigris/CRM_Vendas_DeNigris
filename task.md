@@ -37,5 +37,6 @@ Este arquivo registra e rastreia o andamento de todas as tarefas comerciais e t�
 | 27 | Rota Pública Temporária de Auditoria /debug-db-status | ✅ Concluído | 19/05/2026 | 19/05/2026 | Implementado para auditoria temporária pós-deploy e em seguida removido com sucesso para restaurar a segurança. |
 | 28 | Migração Leve baseada em ALTER TYPE para PostgreSQL | ✅ Concluído | 19/05/2026 | 19/05/2026 | Abordagem de ALTER TYPE que foi implementada mas se provou insuficiente contra concorrência e causou novas falhas. |
 | 29 | Conversão Definitiva de Enums Físicos para VARCHAR | ✅ Concluído | 19/05/2026 | 19/05/2026 | Alteradas fisicamente as colunas de leads e tasks em produção e atualizado main.py com DDL de VARCHAR incondicional para evitar conflitos de enums no Postgres. |
+| 30 | Melhorias Visuais no Kanban & Refinamento de Tags | ✅ Concluído | 19/05/2026 | 19/05/2026 | Adicionada busca global, tooltips interativos nas colunas, removidas flags visuais extras dos cards, encolhido tamanho do card, alterado status inicial para 'novo' e implementada higienização de tags. |
 
 

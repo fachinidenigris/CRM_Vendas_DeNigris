@@ -31,6 +31,8 @@ export function KanbanBoard() {
   const [users, setUsers] = useState<UserType[]>([]);
   const [outcomeModal, setOutcomeModal] = useState<{ isOpen: boolean, type: 'venda_realizada' | 'venda_perdida' | null, leadId: string | null }>({ isOpen: false, type: null, leadId: null });
   const [activeMenuLeadId, setActiveMenuLeadId] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeHelpColId, setActiveHelpColId] = useState<string | null>(null);
   
   // Custom Toast System (UX Mobile-First)
   const [toasts, setToasts] = useState<ToastMessage[]>([]);
@@ -168,34 +170,90 @@ export function KanbanBoard() {
     }
   };
 
+  const filteredLeads = leads.filter((lead) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      (lead.name && lead.name.toLowerCase().includes(q)) ||
+      (lead.email && lead.email.toLowerCase().includes(q)) ||
+      (lead.phone && lead.phone.toLowerCase().includes(q)) ||
+      (lead.company && lead.company.toLowerCase().includes(q)) ||
+      (lead.product_interest && lead.product_interest.toLowerCase().includes(q))
+    );
+  });
+
   return (
-    <div className="flex h-[calc(100vh-190px)] min-h-[500px] space-x-4 overflow-x-auto pb-6 select-none relative">
-      {COLUMNS.map((col) => {
-        const colLeads = leads.filter(l => l.status === col.id);
-        const isOver = dragOverColumn === col.id;
-        
-        return (
-          <div 
-            key={col.id} 
-            onDragOver={(e) => handleDragOver(e, col.id)}
-            onDrop={(e) => handleDrop(e, col.id)}
-            onDragLeave={() => setDragOverColumn(null)}
-            className={`flex flex-col min-w-[320px] w-[320px] h-full rounded-xl border transition-all duration-200 ${
-              isOver ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : 'border-border bg-foreground/5'
-            }`}
+    <div className="flex flex-col h-full space-y-4 relative w-full">
+      {/* Barra de Busca Global */}
+      <div className="flex items-center bg-card border border-border px-4 py-2 rounded-xl shadow-sm max-w-md w-full">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5 text-foreground/45 mr-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+        </svg>
+        <input 
+          type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Buscar por nome, e-mail, celular, veículo..."
+          className="w-full bg-transparent text-xs text-foreground outline-none placeholder-foreground/45 font-semibold"
+        />
+        {searchQuery && (
+          <button 
+            onClick={() => setSearchQuery('')}
+            className="text-foreground/45 hover:text-foreground p-0.5 rounded-full hover:bg-foreground/5 transition-all text-xs"
           >
-            {/* Header da Coluna */}
-            <div className={`p-4 border-t-4 ${col.color} bg-card rounded-t-xl border-b border-border flex justify-between items-center shadow-sm`}>
-              <div className="flex items-center space-x-2">
-                <h3 className="font-semibold text-sm text-foreground/90">{col.title}</h3>
-                <span title={col.help} className="cursor-help flex items-center">
-                  <Info size={14} className="text-foreground/30 hover:text-primary transition-colors" />
+            ✕
+          </button>
+        )}
+      </div>
+
+      <div className="flex flex-1 h-[calc(100vh-250px)] min-h-[450px] space-x-4 overflow-x-auto pb-6 select-none relative">
+        {COLUMNS.map((col) => {
+          const colLeads = filteredLeads.filter(l => l.status === col.id);
+          const isOver = dragOverColumn === col.id;
+          
+          return (
+            <div 
+              key={col.id} 
+              onDragOver={(e) => handleDragOver(e, col.id)}
+              onDrop={(e) => handleDrop(e, col.id)}
+              onDragLeave={() => setDragOverColumn(null)}
+              className={`flex flex-col min-w-[300px] w-[300px] h-full rounded-xl border transition-all duration-200 ${
+                isOver ? 'border-primary ring-2 ring-primary/20 bg-primary/5' : 'border-border bg-foreground/5'
+              }`}
+            >
+              {/* Header da Coluna */}
+              <div className={`p-4 border-t-4 ${col.color} bg-card rounded-t-xl border-b border-border flex justify-between items-center shadow-sm`}>
+                <div className="flex items-center space-x-2 relative">
+                  <h3 className="font-semibold text-sm text-foreground/90">{col.title}</h3>
+                  <button 
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setActiveHelpColId(activeHelpColId === col.id ? null : col.id);
+                    }}
+                    className="flex items-center text-foreground/30 hover:text-primary transition-colors cursor-pointer"
+                    title="Ver informações da etapa"
+                  >
+                    <Info size={14} />
+                  </button>
+
+                  {activeHelpColId === col.id && (
+                    <>
+                      <div className="fixed inset-0 z-40" onClick={() => setActiveHelpColId(null)} />
+                      <div className="absolute left-0 mt-6 w-64 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl p-3 z-50 text-xs text-slate-200 animate-in fade-in slide-in-from-top-2 duration-150">
+                        <div className="flex justify-between items-start mb-1.5">
+                          <span className="font-bold text-[10px] uppercase text-primary tracking-wider">Sobre esta etapa</span>
+                          <button onClick={() => setActiveHelpColId(null)} className="text-foreground/45 hover:text-foreground text-[10px]">✕</button>
+                        </div>
+                        <p className="leading-relaxed font-medium">{col.help}</p>
+                      </div>
+                    </>
+                  )}
+                </div>
+                <span className="text-xs text-foreground/50 font-normal">
+                  {colLeads.length}
                 </span>
               </div>
-              <span className="text-xs text-foreground/50 font-normal">
-                {colLeads.length}
-              </span>
-            </div>
 
             {/* Área de Cards (rolagem vertical interna independente) */}
             <div className="flex-1 p-3 space-y-3 overflow-y-auto">
@@ -207,25 +265,13 @@ export function KanbanBoard() {
                     draggable
                     onDragStart={(e) => handleDragStart(e, lead.id)}
                     onClick={() => openLeadDetails(lead)}
-                    className="bg-card border border-border p-4 rounded-xl shadow-sm hover:shadow-md hover:border-primary/40 active:border-primary transition-all cursor-grab active:cursor-grabbing group relative overflow-hidden"
+                    className="bg-card border border-border p-3 rounded-xl shadow-sm hover:shadow-md hover:border-primary/40 active:border-primary transition-all cursor-grab active:cursor-grabbing group relative overflow-hidden"
                   >
                     <div className="absolute top-0 left-0 w-1.5 h-full bg-border group-hover:bg-primary transition-colors shrink-0"></div>
                     
-                    <div className="flex justify-between items-start mb-2 pl-2">
+                    <div className="flex justify-between items-start mb-1 pl-2">
                       <div className="flex items-center space-x-2 max-w-[85%]">
-                        {/* Prioridade */}
-                        {lead.priority && (
-                          <span className={`text-[9px] uppercase font-bold tracking-wider px-1.5 py-0.5 rounded ${
-                            lead.priority === 'alta' ? 'bg-red-500/10 text-red-500' :
-                            lead.priority === 'media' ? 'bg-yellow-500/10 text-yellow-500' :
-                            'bg-slate-500/10 text-slate-500'
-                          }`}>
-                            Prio {lead.priority}
-                          </span>
-                        )}
-                        <span className="text-[10px] uppercase font-bold tracking-wider text-foreground/50 truncate">
-                          {lead.source || 'IMAP'}
-                        </span>
+                        {/* Removido prioridade e origem */}
                       </div>
 
                       {/* Botão de Transição Touch / Mobile-Friendly */}
@@ -294,39 +340,20 @@ export function KanbanBoard() {
                     </div>
                     
                     <div className="pl-2">
-                      <h4 className="font-bold text-sm text-foreground/90 group-hover:text-primary transition-colors truncate" title={lead.name}>
+                      <h4 className="font-bold text-xs text-foreground/90 group-hover:text-primary transition-colors truncate" title={lead.name}>
                         {lead.name}
                       </h4>
                       
-                      <p className="text-xs text-foreground/60 mt-1 flex items-center truncate" title={lead.company || lead.source}>
+                      <p className="text-[11px] text-foreground/60 mt-1 flex items-center truncate" title={lead.company || lead.source}>
                         <Briefcase size={12} className="mr-1 shrink-0 text-foreground/40" /> {lead.company || 'Pessoa Física'}
                       </p>
 
-                      <p className="text-xs text-foreground/60 mt-0.5 flex items-center font-semibold truncate text-primary" title={lead.product_interest || ''}>
+                      <p className="text-[11px] text-foreground/60 mt-0.5 flex items-center font-semibold truncate text-primary" title={lead.product_interest || ''}>
                         <Tag size={12} className="mr-1 shrink-0 text-primary/70" /> {lead.product_interest || 'Sem veículo de interesse'}
                       </p>
 
-                      {/* Badges de Categorias / Tags */}
-                      <div className="flex flex-wrap gap-1 mt-3">
-                        {lead.category && (
-                          <span className={`text-[10px] px-2 py-0.5 rounded-md font-semibold ${getCategoryBadgeClass(lead.category)}`}>
-                            {lead.category}
-                          </span>
-                        )}
-                        {lead.client_type && (
-                          <span className="text-[10px] px-2 py-0.5 rounded-md font-semibold bg-foreground/5 text-foreground/70 border border-border">
-                            {lead.client_type}
-                          </span>
-                        )}
-                        {leadTags.slice(0, 2).map((t, idx) => (
-                          <span key={idx} className="text-[10px] px-1.5 py-0.5 rounded-md bg-primary/5 text-primary border border-primary/10">
-                            {t.trim()}
-                          </span>
-                        ))}
-                      </div>
-
                       {/* Rodapé do Card */}
-                      <div className="flex justify-between items-center mt-4 pt-3 border-t border-border">
+                      <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-border">
                         <div className="flex items-center space-x-1" title="Vendedor Atribuído">
                           <UserIcon size={12} className="text-foreground/40" />
                           <span className="text-[10px] text-foreground/60 font-medium truncate max-w-[120px]">
@@ -358,6 +385,8 @@ export function KanbanBoard() {
           </div>
         );
       })}
+      
+      </div>
 
       {/* Drawer do Lead Selecionado */}
       <LeadDrawer 

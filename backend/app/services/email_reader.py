@@ -70,6 +70,50 @@ def get_next_seller_round_robin(category: str, db: Session) -> models.User | Non
             
     return selected_seller
 
+
+def sanitize_and_enrich_tags(tags_str: str | None, product_interest: str | None) -> str:
+    tags_set = set()
+    
+    # 1. Tratar as tags vindas da IA
+    if tags_str:
+        # Divide e limpa
+        raw_tags = [t.strip().lower() for t in tags_str.split(",") if t.strip()]
+        for tag in raw_tags:
+            # Filtra "alto potencial" e variações
+            if tag in ["alto potencial", "alto-potencial", "alto_potencial"]:
+                continue
+            # Padroniza sem acentos para algumas tags comuns
+            if tag == "autônomo":
+                tag = "autonomo"
+            tags_set.add(tag)
+            
+    # 2. Enriquecer com tags do produto de interesse
+    if product_interest:
+        prod_lower = product_interest.lower()
+        if "sprinter" in prod_lower:
+            tags_set.add("sprinter")
+            tags_set.add("van")
+        if "accelo" in prod_lower:
+            tags_set.add("accelo")
+            tags_set.add("caminhao")
+        if "atego" in prod_lower:
+            tags_set.add("atego")
+            tags_set.add("caminhao")
+        if "actros" in prod_lower:
+            tags_set.add("actros")
+            tags_set.add("caminhao")
+        if "arox" in prod_lower:
+            tags_set.add("arox")
+            tags_set.add("caminhao")
+        if "axor" in prod_lower:
+            tags_set.add("axor")
+            tags_set.add("caminhao")
+        if ("caminhão" in prod_lower or "caminhao" in prod_lower) and "caminhao" not in tags_set:
+            tags_set.add("caminhao")
+            
+    return ",".join(sorted(list(tags_set)))
+
+
 def fetch_unread_emails():
     """Busca e-mails não lidos no Gmail."""
     mail = connect_imap()
@@ -194,8 +238,8 @@ def fetch_unread_emails():
                                 category=ai_data.category,
                                 subcategory=ai_data.subcategory,
                                 client_type=ai_data.client_type,
-                                tags=ai_data.tags,
-                                status=models.LeadStatusEnum.distribuido if vendedor else models.LeadStatusEnum.novo,
+                                tags=sanitize_and_enrich_tags(ai_data.tags, ai_data.product_interest),
+                                status=models.LeadStatusEnum.novo,
                                 priority=ai_data.priority,
                                 urgency_level=ai_data.urgency_level,
                                 ai_summary=ai_data.ai_summary,
