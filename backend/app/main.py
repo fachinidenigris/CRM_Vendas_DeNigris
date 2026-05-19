@@ -50,22 +50,36 @@ def run_migrations():
                 print(f"[MIGRATION-PG] {table}.{column}: tipo='{data_type}'")
                 if data_type == "USER-DEFINED":
                     print(f"[MIGRATION-PG] Convertendo {table}.{column} ENUM -> VARCHAR...")
-                    # 1. Remover o default antigo para evitar bloqueio de tipo
+                    # 1. Remover constraint CHECK de validação de ENUM do SQLAlchemy para destravar a alteração física
+                    cursor.execute(f"ALTER TABLE {table} DROP CONSTRAINT IF EXISTS {table}_{column}_check;")
+                    # 2. Remover o default antigo para evitar bloqueio de tipo
                     cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} DROP DEFAULT;")
-                    # 2. Converter o tipo de coluna
+                    # 3. Converter o tipo de coluna
                     cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR USING {column}::text;")
-                    # 3. Adicionar o novo default como VARCHAR
+                    # 4. Adicionar o novo default como VARCHAR
                     cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT '{default_val}';")
-                    print(f"[MIGRATION-PG] ✅ {table}.{column} convertida para VARCHAR com sucesso!")
+                    print(f"[MIGRATION-PG] [SUCESSO] {table}.{column} convertida para VARCHAR!")
 
             migrate_col_to_varchar("leads", "status", "novo")
             migrate_col_to_varchar("leads", "priority", "media")
             migrate_col_to_varchar("tasks", "task_type", "outro")
 
             cursor.close()
-            print("[MIGRATION-PG] ✅ Bloco 1 concluído.")
+            print("[MIGRATION-PG] Bloco 1 concluido.")
         except Exception as err:
-            print(f"[MIGRATION-PG] ⚠️ Erro no Bloco 1 (ENUM->VARCHAR): {err}")
+            print(f"[MIGRATION-PG] [ERRO] Bloco 1 (ENUM->VARCHAR): {err}")
+            try:
+                db_log = SessionLocal()
+                log_entry = models.SystemLog(
+                    log_type="ERROR",
+                    source="MIGRATION_PG",
+                    message=f"Falha ao migrar ENUM->VARCHAR no Postgres: {str(err)}"
+                )
+                db_log.add(log_entry)
+                db_log.commit()
+                db_log.close()
+            except Exception as log_err:
+                print(f"[MIGRATION-PG] Erro ao gravar log de falha no banco: {log_err}")
         finally:
             if raw_conn:
                 try:
@@ -111,10 +125,10 @@ def run_migrations():
 
         db.execute(text("UPDATE leads SET is_archived = FALSE WHERE is_archived IS NULL"))
         db.commit()
-        print("[MIGRATION] ✅ Bloco 2 concluído.")
+        print("[MIGRATION] Bloco 2 concluido.")
 
     except Exception as e:
-        print(f"[MIGRATION] ⚠️ Erro no Bloco 2 (schema): {e}")
+        print(f"[MIGRATION] [ERRO] Bloco 2 (schema): {e}")
         db.rollback()
     finally:
         db.close()
@@ -142,13 +156,13 @@ def run_migrations():
             cursor3.execute("UPDATE leads SET status = 'qualificacao' WHERE status IN ('primeiro_contato_realizado', 'lead_qualificado')")
             cursor3.execute("UPDATE leads SET status = 'distribuido' WHERE status IN ('enviado_para_vendedor', 'em_negociacao')")
             cursor3.execute("UPDATE leads SET status = 'venda_realizada' WHERE status = 'venda_ganha'")
-            print("[MIGRATION] ✅ Bloco 3 — status legados sincronizados.")
+            print("[MIGRATION] Bloco 3 - status legados sincronizados.")
         else:
-            print("[MIGRATION] ⚠️ leads.status ainda é ENUM. UPDATE de status legados pulado por segurança.")
+            print("[MIGRATION] [AVISO] leads.status ainda é ENUM. UPDATE de status legados pulado por segurança.")
 
         cursor3.close()
     except Exception as e:
-        print(f"[MIGRATION] ⚠️ Erro no Bloco 3 (status legados): {e}")
+        print(f"[MIGRATION] [ERRO] Bloco 3 (status legados): {e}")
     finally:
         if raw_conn3:
             try:
