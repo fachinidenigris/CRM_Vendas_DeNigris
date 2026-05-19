@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   MoreVertical, Clock, MessageSquare, Briefcase, RefreshCw, Calendar, 
-  Tag, User as UserIcon, Info, X, Check, AlertCircle 
+  Tag, User as UserIcon, Info, X, Check, AlertCircle, Search 
 } from 'lucide-react';
 import { api, Lead, User as UserType } from '@/lib/api';
 import { LeadDrawer } from './LeadDrawer';
@@ -185,10 +185,8 @@ export function KanbanBoard() {
   return (
     <div className="flex flex-col h-full space-y-4 relative w-full">
       {/* Barra de Busca Global */}
-      <div className="flex items-center bg-card border border-border px-4 py-2 rounded-xl shadow-sm max-w-md w-full">
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5 text-foreground/45 mr-2.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+      <div className="flex items-center bg-card border border-border px-3 py-1.5 rounded-lg shadow-sm max-w-[280px] w-full focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+        <Search size={14} className="text-foreground/40 mr-2 shrink-0" />
         <input 
           type="text"
           value={searchQuery}
