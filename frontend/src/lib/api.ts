@@ -27,6 +27,15 @@ export interface SystemLog {
   created_at: string;
 }
 
+export interface LeadRoutingRule {
+  id: string;
+  keyword: string;
+  action: 'block' | 'redirect';
+  team_id: string | null;
+  created_at: string;
+}
+
+
 export interface Lead {
   id: string;
   name: string;
@@ -86,6 +95,11 @@ export interface Lead {
   priority?: 'baixa' | 'media' | 'alta' | 'critica' | string;
   
   assigned_to_id?: string | null;
+  
+  // Indicação Externa
+  external_seller_name?: string | null;
+  external_department?: string | null;
+  external_dealer?: string | null;
 }
 
 export interface Task {
@@ -453,5 +467,66 @@ export const api = {
       console.error(err);
       return false;
     }
+  },
+
+  getRoutingRules: async (): Promise<LeadRoutingRule[]> => {
+    try {
+      const res = await securedFetch(`${API_URL}/routing-rules`, { cache: 'no-store' });
+      if (!res.ok) throw new Error('Falha ao buscar regras de distribuição');
+      return await res.json();
+    } catch (err) {
+      console.error(err);
+      return [];
+    }
+  },
+
+  createRoutingRule: async (rule: Omit<LeadRoutingRule, 'id' | 'created_at'>): Promise<LeadRoutingRule | null> => {
+    try {
+      const res = await securedFetch(`${API_URL}/routing-rules`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(rule)
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || 'Falha ao criar regra de distribuição');
+      }
+      return await res.json();
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  },
+
+  updateRoutingRule: async (ruleId: string, ruleUpdate: Partial<Omit<LeadRoutingRule, 'id' | 'created_at'>>): Promise<LeadRoutingRule | null> => {
+    try {
+      const res = await securedFetch(`${API_URL}/routing-rules/${ruleId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(ruleUpdate)
+      });
+      if (!res.ok) {
+        const errorData = await res.json();
+        throw new Error(errorData.detail || 'Falha ao atualizar regra de distribuição');
+      }
+      return await res.json();
+    } catch (err) {
+      console.error(err);
+      return null;
+    }
+  },
+
+  deleteRoutingRule: async (ruleId: string): Promise<boolean> => {
+    try {
+      const res = await securedFetch(`${API_URL}/routing-rules/${ruleId}`, {
+        method: 'DELETE'
+      });
+      if (!res.ok) throw new Error('Falha ao excluir regra de distribuição');
+      return true;
+    } catch (err) {
+      console.error(err);
+      return false;
+    }
   }
 };
+

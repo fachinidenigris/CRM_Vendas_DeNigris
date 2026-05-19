@@ -38,5 +38,11 @@ Este arquivo registra e rastreia o andamento de todas as tarefas comerciais e t�
 | 28 | Migração Leve baseada em ALTER TYPE para PostgreSQL | ✅ Concluído | 19/05/2026 | 19/05/2026 | Abordagem de ALTER TYPE que foi implementada mas se provou insuficiente contra concorrência e causou novas falhas. |
 | 29 | Conversão Definitiva de Enums Físicos para VARCHAR | ✅ Concluído | 19/05/2026 | 19/05/2026 | Alteradas fisicamente as colunas de leads e tasks em produção e atualizado main.py com DDL de VARCHAR incondicional para evitar conflitos de enums no Postgres. |
 | 30 | Melhorias Visuais no Kanban & Refinamento de Tags | ✅ Concluído | 19/05/2026 | 19/05/2026 | Adicionada busca global, tooltips interativos nas colunas, removidas flags visuais extras dos cards, encolhido tamanho do card, alterado status inicial para 'novo' e implementada higienização de tags. |
+| 31 | Kanban: Botão de Recolher Sidebar | ✅ Concluído | 19/05/2026 | 19/05/2026 | Implementado recolhimento com localStorage e animação Tailwind. |
+| 32 | Kanban: Otimização de Espaço nos Cards | ✅ Concluído | 19/05/2026 | 19/05/2026 | Reduzidos paddings, margens e reposicionado botão de opções de forma absoluta. |
+| 33 | Kanban: Badge de Leads não Visualizados | ✅ Concluído | 19/05/2026 | 19/05/2026 | Adicionada badge numérica pulsante vermelha no header da coluna de Leads Novos. |
+| 34 | Kanban: Modal e Fluxo de Lead Distribuído Externo | ✅ Concluído | 19/05/2026 | 19/05/2026 | Implementada interceptação ao arrastar/mover para distribuído solicitando dados de indicação e exibindo vendedor externo no card. |
+| 35 | Kanban: Refinamento e Correção da Busca Global | ✅ Concluído | 19/05/2026 | 19/05/2026 | Refazer busca global corrigindo interação de clique (pointer-events, overlay) e layout responsivo. |
+| 36 | Kanban: Correção do Botão "i" Info de Etapas | ✅ Concluído | 19/05/2026 | 19/05/2026 | Aumentar área clicável (paddings) e z-index do tooltip informativo. |
 
 

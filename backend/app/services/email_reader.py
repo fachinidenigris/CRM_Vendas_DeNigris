@@ -21,33 +21,46 @@ def connect_imap():
         logger.error(f"Falha ao conectar no IMAP: {e}")
         return None
 
-def get_next_seller_round_robin(category: str, db: Session) -> models.User | None:
+def get_next_seller_round_robin(category: str, db: Session, target_team_id = None) -> models.User | None:
     """Busca o próximo vendedor ativo, não pausado, de forma justa por rodízio (por equipe ou global)."""
     # 1. Obter todos os vendedores ativos e não pausados
-    active_sellers = db.query(models.User).filter(
+    query = db.query(models.User).filter(
         models.User.role == models.RoleEnum.vendedor,
         models.User.is_paused == False
-    ).all()
+    )
+    
+    if target_team_id:
+        active_sellers = query.filter(models.User.team_id == target_team_id).all()
+    else:
+        active_sellers = query.all()
     
     if not active_sellers:
-        return None
+        # Se pedimos equipe e não tem ninguém ativo/não pausado nela, tenta pegar geral para não perder o lead
+        if target_team_id:
+            active_sellers = db.query(models.User).filter(
+                models.User.role == models.RoleEnum.vendedor,
+                models.User.is_paused == False
+            ).all()
+        if not active_sellers:
+            return None
         
     # 2. Distribuição por equipes
-    # Se houver mais de uma equipe cadastrada, tentar direcionar de acordo com a categoria do lead
-    teams = db.query(models.Team).all()
-    target_team = None
-    if len(teams) > 1 and category:
-        category_lower = category.lower()
-        for t in teams:
-            if t.name.lower() in category_lower or category_lower in t.name.lower():
-                target_team = t
-                break
-                
-    if target_team:
-        # Filtrar os vendedores ativos e não pausados dessa equipe específica
-        team_sellers = [s for s in active_sellers if s.team_id == target_team.id]
-        if team_sellers:
-            active_sellers = team_sellers
+    # Se houver mais de uma equipe cadastrada e não foi especificada uma equipe pela regra, direcionar de acordo com a categoria
+    if not target_team_id:
+        teams = db.query(models.Team).all()
+        target_team = None
+        if len(teams) > 1 and category:
+            category_lower = category.lower()
+            for t in teams:
+                if t.name.lower() in category_lower or category_lower in t.name.lower():
+                    target_team = t
+                    break
+                    
+        if target_team:
+            # Filtrar os vendedores ativos e não pausados dessa equipe específica
+            team_sellers = [s for s in active_sellers if s.team_id == target_team.id]
+            if team_sellers:
+                active_sellers = team_sellers
             
     # 3. Lógica matemática de Rodízio (Fair Distribution):
     # Quem recebeu lead há mais tempo (ou nunca recebeu) é o próximo
@@ -69,6 +82,7 @@ def get_next_seller_round_robin(category: str, db: Session) -> models.User | Non
             selected_seller = seller
             
     return selected_seller
+
 
 
 def sanitize_and_enrich_tags(tags_str: str | None, product_interest: str | None) -> str:
@@ -224,8 +238,51 @@ def fetch_unread_emails():
                         # 2. Salvar no Banco
                         db: Session = SessionLocal()
                         try:
+                            # 2.1 Verificar se existe alguma regra de redirecionamento ou bloqueio
+                            matched_rule = None
+                            rules = db.query(models.LeadRoutingRule).all()
+                            
+                            # Normaliza strings para busca insensível a caixa e acentos (para maior resiliência)
+                            def normalize_text(text: str | None) -> str:
+                                if not text:
+                                    return ""
+                                import unicodedata
+                                return "".join(c for c in unicodedata.normalize('NFD', text.lower()) if unicodedata.category(c) != 'Mn')
+
+                            body_norm = normalize_text(body_to_parse)
+                            subject_norm = normalize_text(subject)
+                            interest_norm = normalize_text(ai_data.product_interest)
+                            name_norm = normalize_text(ai_data.name)
+                            summary_norm = normalize_text(ai_data.ai_summary)
+                            
+                            for rule in rules:
+                                rule_kw_norm = normalize_text(rule.keyword)
+                                if not rule_kw_norm:
+                                    continue
+                                if (rule_kw_norm in body_norm or 
+                                    rule_kw_norm in subject_norm or 
+                                    rule_kw_norm in interest_norm or 
+                                    rule_kw_norm in name_norm or 
+                                    rule_kw_norm in summary_norm):
+                                    matched_rule = rule
+                                    break
+                                    
+                            if matched_rule and matched_rule.action == "block":
+                                print(f"[RULE MATCH] Lead contendo '{matched_rule.keyword}' bloqueado automaticamente.")
+                                log_entry = models.SystemLog(
+                                    log_type="EMAIL_IGNORADO",
+                                    source="IMAP_READER",
+                                    message=f"Lead '{ai_data.name}' de '{sender}' contendo '{matched_rule.keyword}' bloqueado automaticamente pela regra de distribuição."
+                                )
+                                db.add(log_entry)
+                                db.commit()
+                                mail.store(e_id, '+FLAGS', '\\Seen')
+                                continue
+                                
+                            target_team_id = matched_rule.team_id if (matched_rule and matched_rule.action == "redirect") else None
+                            
                             # Tentar distribuir automaticamente via rodízio inteligente (round-robin)
-                            vendedor = get_next_seller_round_robin(ai_data.category, db)
+                            vendedor = get_next_seller_round_robin(ai_data.category, db, target_team_id=target_team_id)
                             
                             novo_lead = models.Lead(
                                 name=ai_data.name,
@@ -249,23 +306,30 @@ def fetch_unread_emails():
                             db.commit()
                             db.refresh(novo_lead)
                             
+                            rule_info = ""
+                            if matched_rule and matched_rule.action == "redirect":
+                                target_team_name = db.query(models.Team).filter(models.Team.id == matched_rule.team_id).first()
+                                team_name_str = target_team_name.name if target_team_name else "equipe destino"
+                                rule_info = f" (Redirecionado pela regra da palavra-chave: '{matched_rule.keyword}' para {team_name_str})"
+                            
                             # Criar timeline do e-mail recebido
                             atividade = models.Activity(
                                 lead_id=novo_lead.id,
                                 activity_type=models.ActivityTypeEnum.email_recebido,
-                                content=f"Assunto: {subject}\n\n{body}"
+                                content=f"Assunto: {subject}\n\nRegra aplicada: {rule_info if rule_info else 'Nenhuma (Distribuição normal)'}\n\n{body}"
                             )
                             db.add(atividade)
                             
                             # Registrar Log de Sucesso no Banco
+                            log_message = f"Novo lead '{novo_lead.name}' ({novo_lead.email}) capturado com sucesso!{rule_info}"
                             log_entry = models.SystemLog(
                                 log_type="EMAIL_RECEBIDO",
                                 source="IMAP_READER",
-                                message=f"Novo lead '{novo_lead.name}' ({novo_lead.email}) capturado com sucesso!"
+                                message=log_message
                             )
                             db.add(log_entry)
                             db.commit()
-                            print(f"[SUCCESS] Lead '{ai_data.name}' criado via IMAP com sucesso.")
+                            print(f"[SUCCESS] Lead '{ai_data.name}' criado via IMAP com sucesso. {rule_info}")
                             
                             # Marcar e-mail como lido apenas após persistência e commit bem sucedidos no DB!
                             mail.store(e_id, '+FLAGS', '\\Seen')

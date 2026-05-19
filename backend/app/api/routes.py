@@ -485,3 +485,84 @@ def delete_team(
     db.delete(team)
     db.commit()
     return {"message": "Equipe comercial excluída com sucesso."}
+
+# --- LEAD ROUTING RULES ---
+
+@router.get("/routing-rules", response_model=List[crm.LeadRoutingRuleResponse], tags=["Routing Rules"])
+def get_routing_rules(
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """Busca todas as regras de distribuição cadastradas."""
+    if current_user.role != models.RoleEnum.admin:
+        raise HTTPException(status_code=403, detail="Acesso restrito ao Diretor/Administrador.")
+    return db.query(models.LeadRoutingRule).order_by(models.LeadRoutingRule.created_at.desc()).all()
+
+@router.post("/routing-rules", response_model=crm.LeadRoutingRuleResponse, tags=["Routing Rules"], status_code=status.HTTP_201_CREATED)
+def create_routing_rule(
+    rule_in: crm.LeadRoutingRuleCreate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """Cria uma nova regra de distribuição."""
+    if current_user.role != models.RoleEnum.admin:
+        raise HTTPException(status_code=403, detail="Acesso restrito ao Diretor/Administrador.")
+    # Check if keyword already exists (case-insensitive)
+    existing = db.query(models.LeadRoutingRule).filter(
+        models.LeadRoutingRule.keyword.ilike(rule_in.keyword)
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="Esta palavra-chave já está cadastrada.")
+    
+    rule = models.LeadRoutingRule(**rule_in.model_dump())
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    return rule
+
+@router.patch("/routing-rules/{rule_id}", response_model=crm.LeadRoutingRuleResponse, tags=["Routing Rules"])
+def update_routing_rule(
+    rule_id: UUID,
+    rule_in: crm.LeadRoutingRuleUpdate,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """Atualiza uma regra de distribuição."""
+    if current_user.role != models.RoleEnum.admin:
+        raise HTTPException(status_code=403, detail="Acesso restrito ao Diretor/Administrador.")
+    rule = db.query(models.LeadRoutingRule).filter(models.LeadRoutingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Regra não encontrada.")
+    
+    update_data = rule_in.model_dump(exclude_unset=True)
+    if "keyword" in update_data and update_data["keyword"].lower() != rule.keyword.lower():
+        existing = db.query(models.LeadRoutingRule).filter(
+            models.LeadRoutingRule.keyword.ilike(update_data["keyword"])
+        ).first()
+        if existing:
+            raise HTTPException(status_code=400, detail="Esta palavra-chave já está cadastrada.")
+            
+    for field, value in update_data.items():
+        setattr(rule, field, value)
+        
+    db.add(rule)
+    db.commit()
+    db.refresh(rule)
+    return rule
+
+@router.delete("/routing-rules/{rule_id}", tags=["Routing Rules"])
+def delete_routing_rule(
+    rule_id: UUID,
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(security.get_current_user)
+):
+    """Exclui uma regra de distribuição."""
+    if current_user.role != models.RoleEnum.admin:
+        raise HTTPException(status_code=403, detail="Acesso restrito ao Diretor/Administrador.")
+    rule = db.query(models.LeadRoutingRule).filter(models.LeadRoutingRule.id == rule_id).first()
+    if not rule:
+        raise HTTPException(status_code=404, detail="Regra não encontrada.")
+    db.delete(rule)
+    db.commit()
+    return {"message": "Regra excluída com sucesso."}
+

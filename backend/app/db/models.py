@@ -143,6 +143,11 @@ class Lead(Base):
     sale_product = Column(String, nullable=True)
     sale_model = Column(String, nullable=True)
     
+    # 10. Indicação / Vendedor Externo (Fase Distribuído)
+    external_seller_name = Column(String, nullable=True)
+    external_department = Column(String, nullable=True)
+    external_dealer = Column(String, nullable=True)
+    
     # Arquivamento
     is_archived = Column(Boolean, default=False, nullable=False)
     
@@ -204,3 +209,15 @@ class SystemLog(Base):
     source = Column(String, nullable=False) # e.g. 'IMAP_READER', 'SLA_CHECKER'
     message = Column(Text, nullable=False)
     created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+class LeadRoutingRule(Base):
+    __tablename__ = "lead_routing_rules"
+
+    id = Column(Uuid, primary_key=True, default=uuid.uuid4)
+    keyword = Column(String, unique=True, index=True, nullable=False)
+    action = Column(String, nullable=False) # 'block' ou 'redirect'
+    team_id = Column(Uuid, ForeignKey("teams.id"), nullable=True)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc))
+
+    team = relationship("Team", foreign_keys=[team_id])
+

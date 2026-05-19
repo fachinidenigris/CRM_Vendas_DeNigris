@@ -115,6 +115,11 @@ class LeadCreate(BaseModel):
     urgency_level: Optional[str] = None
     ai_summary: Optional[str] = None
     assigned_to_id: Optional[UUID] = None
+    
+    # Indicação Externa
+    external_seller_name: Optional[str] = None
+    external_department: Optional[str] = None
+    external_dealer: Optional[str] = None
 
 class LeadUpdate(BaseModel):
     name: Optional[str] = None
@@ -169,6 +174,11 @@ class LeadUpdate(BaseModel):
     assigned_to_id: Optional[UUID] = None
     last_contact_at: Optional[datetime] = None
     last_interaction_at: Optional[datetime] = None
+    
+    # Indicação Externa
+    external_seller_name: Optional[str] = None
+    external_department: Optional[str] = None
+    external_dealer: Optional[str] = None
 
 class LeadResponse(LeadCreate):
     id: UUID
@@ -218,3 +228,22 @@ class SystemLogResponse(BaseModel):
     message: str
     created_at: datetime
     model_config = ConfigDict(from_attributes=True)
+
+class LeadRoutingRuleBase(BaseModel):
+    keyword: str
+    action: str
+    team_id: Optional[UUID] = None
+
+class LeadRoutingRuleCreate(LeadRoutingRuleBase):
+    pass
+
+class LeadRoutingRuleResponse(LeadRoutingRuleBase):
+    id: UUID
+    created_at: datetime
+    model_config = ConfigDict(from_attributes=True)
+
+class LeadRoutingRuleUpdate(BaseModel):
+    keyword: Optional[str] = None
+    action: Optional[str] = None
+    team_id: Optional[UUID] = None
+

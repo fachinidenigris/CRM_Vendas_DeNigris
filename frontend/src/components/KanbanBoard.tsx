@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { 
   MoreVertical, Clock, MessageSquare, Briefcase, RefreshCw, Calendar, 
-  Tag, User as UserIcon, Info, X, Check, AlertCircle, Search 
+  Tag, User as UserIcon, Info, X, Check, AlertCircle, Search, Users 
 } from 'lucide-react';
 import { api, Lead, User as UserType } from '@/lib/api';
 import { LeadDrawer } from './LeadDrawer';
@@ -29,7 +29,7 @@ export function KanbanBoard() {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [dragOverColumn, setDragOverColumn] = useState<string | null>(null);
   const [users, setUsers] = useState<UserType[]>([]);
-  const [outcomeModal, setOutcomeModal] = useState<{ isOpen: boolean, type: 'venda_realizada' | 'venda_perdida' | null, leadId: string | null }>({ isOpen: false, type: null, leadId: null });
+  const [outcomeModal, setOutcomeModal] = useState<{ isOpen: boolean, type: 'venda_realizada' | 'venda_perdida' | 'distribuido' | null, leadId: string | null }>({ isOpen: false, type: null, leadId: null });
   const [activeMenuLeadId, setActiveMenuLeadId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeHelpColId, setActiveHelpColId] = useState<string | null>(null);
@@ -97,10 +97,10 @@ export function KanbanBoard() {
     const leadId = e.dataTransfer.getData('leadId');
     if (!leadId) return;
 
-    // Intercepta arraste para colunas de fechamento
-    if (targetStatus === 'venda_realizada' || targetStatus === 'venda_perdida') {
+    // Intercepta arraste para colunas de fechamento e distribuição externa
+    if (targetStatus === 'venda_realizada' || targetStatus === 'venda_perdida' || targetStatus === 'distribuido') {
       setOutcomeForm({}); // Reseta o form
-      setOutcomeModal({ isOpen: true, type: targetStatus as 'venda_realizada' | 'venda_perdida', leadId });
+      setOutcomeModal({ isOpen: true, type: targetStatus as 'venda_realizada' | 'venda_perdida' | 'distribuido', leadId });
       return;
     }
 
@@ -136,8 +136,13 @@ export function KanbanBoard() {
     
     const success = await api.updateLead(outcomeModal.leadId, updateData);
     if (success) {
+      const leadName = leads.find(l => l.id === outcomeModal.leadId)?.name || 'Lead';
       setOutcomeModal({ isOpen: false, type: null, leadId: null });
-      addToast('success', 'Negócio Concluído', outcomeModal.type === 'venda_realizada' ? 'Parabéns! Venda registrada com sucesso.' : 'Lead arquivado como venda perdida.');
+      if (outcomeModal.type === 'distribuido') {
+        addToast('success', 'Lead Distribuído', `Lead "${leadName}" distribuído com sucesso para o vendedor externo.`);
+      } else {
+        addToast('success', 'Negócio Concluído', outcomeModal.type === 'venda_realizada' ? 'Parabéns! Venda registrada com sucesso.' : 'Lead arquivado como venda perdida.');
+      }
       fetchLeads();
     } else {
       setLoading(false);
@@ -145,9 +150,24 @@ export function KanbanBoard() {
     }
   };
 
-  const openLeadDetails = (lead: Lead) => {
+  const openLeadDetails = async (lead: Lead) => {
     setSelectedLead(lead);
     setIsDrawerOpen(true);
+
+    // Se o lead ainda não foi visualizado, marca como visualizado no backend e atualiza localmente
+    if (!lead.visualized_at) {
+      const now = new Date().toISOString();
+      
+      // Atualização otimista local
+      setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, visualized_at: now } : l));
+      
+      // Envia para o backend em background
+      try {
+        await api.updateLead(lead.id, { visualized_at: now });
+      } catch (err) {
+        console.error("Falha ao salvar data de visualização do lead:", err);
+      }
+    }
   };
 
   if (loading && leads.length === 0) {
@@ -172,32 +192,50 @@ export function KanbanBoard() {
 
   const filteredLeads = leads.filter((lead) => {
     if (!searchQuery) return true;
-    const q = searchQuery.toLowerCase();
+    const q = searchQuery.toLowerCase().trim();
+    const cleanQueryPhone = q.replace(/\D/g, '');
+    const cleanLeadPhone = lead.phone ? lead.phone.replace(/\D/g, '') : '';
+    
     return (
       (lead.name && lead.name.toLowerCase().includes(q)) ||
       (lead.email && lead.email.toLowerCase().includes(q)) ||
       (lead.phone && lead.phone.toLowerCase().includes(q)) ||
+      (cleanQueryPhone && cleanLeadPhone.includes(cleanQueryPhone)) ||
       (lead.company && lead.company.toLowerCase().includes(q)) ||
-      (lead.product_interest && lead.product_interest.toLowerCase().includes(q))
+      (lead.product_interest && lead.product_interest.toLowerCase().includes(q)) ||
+      (lead.city_region && lead.city_region.toLowerCase().includes(q)) ||
+      (lead.external_seller_name && lead.external_seller_name.toLowerCase().includes(q))
     );
   });
 
   return (
     <div className="flex flex-col h-full space-y-4 relative w-full">
       {/* Barra de Busca Global */}
-      <div className="flex items-center bg-card border border-border px-3 py-1.5 rounded-lg shadow-sm max-w-[280px] w-full focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-        <Search size={14} className="text-foreground/40 mr-2 shrink-0" />
+      <div 
+        onClick={(e) => {
+          e.stopPropagation();
+          document.getElementById('global-search-input')?.focus();
+        }}
+        className="flex items-center bg-card border border-border px-3.5 py-2 rounded-xl shadow-md max-w-md w-full focus-within:ring-2 focus-within:ring-primary/40 focus-within:border-primary/50 transition-all cursor-text relative z-20 pointer-events-auto"
+      >
+        <Search size={15} className="text-foreground/40 mr-2.5 shrink-0" />
         <input 
+          id="global-search-input"
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Buscar por nome, e-mail, celular, veículo..."
-          className="w-full bg-transparent text-xs text-foreground outline-none placeholder-foreground/45 font-semibold"
+          onClick={(e) => e.stopPropagation()}
+          placeholder="Buscar lead por nome, e-mail, celular, produto..."
+          className="w-full bg-transparent text-sm text-foreground outline-none placeholder-foreground/35 font-medium pointer-events-auto"
         />
         {searchQuery && (
           <button 
-            onClick={() => setSearchQuery('')}
-            className="text-foreground/45 hover:text-foreground p-0.5 rounded-full hover:bg-foreground/5 transition-all text-xs"
+            onClick={(e) => {
+              e.stopPropagation();
+              setSearchQuery('');
+            }}
+            className="text-foreground/45 hover:text-foreground p-1 rounded-full hover:bg-foreground/10 transition-all text-xs shrink-0 cursor-pointer pointer-events-auto"
+            title="Limpar busca"
           >
             ✕
           </button>
@@ -221,15 +259,28 @@ export function KanbanBoard() {
             >
               {/* Header da Coluna */}
               <div className={`p-4 border-t-4 ${col.color} bg-card rounded-t-xl border-b border-border flex justify-between items-center shadow-sm`}>
-                <div className="flex items-center space-x-2 relative">
+                <div className="flex items-center space-x-1.5 relative">
                   <h3 className="font-semibold text-sm text-foreground/90">{col.title}</h3>
+                  {col.id === 'novo' && (
+                    (() => {
+                      const unread = leads.filter(l => l.status === 'novo' && !l.visualized_at).length;
+                      return unread > 0 ? (
+                        <span 
+                          className="bg-red-500 text-white text-[9px] font-extrabold px-1.5 py-0.5 rounded-full animate-pulse shadow-sm shadow-red-500/20"
+                          title={`${unread} leads novos não lidos`}
+                        >
+                          {unread}
+                        </span>
+                      ) : null;
+                    })()
+                  )}
                   <button 
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       setActiveHelpColId(activeHelpColId === col.id ? null : col.id);
                     }}
-                    className="flex items-center text-foreground/30 hover:text-primary transition-colors cursor-pointer"
+                    className="w-7 h-7 flex items-center justify-center rounded-full hover:bg-foreground/5 text-foreground/30 hover:text-primary transition-all cursor-pointer shrink-0 pointer-events-auto"
                     title="Ver informações da etapa"
                   >
                     <Info size={14} />
@@ -237,11 +288,11 @@ export function KanbanBoard() {
 
                   {activeHelpColId === col.id && (
                     <>
-                      <div className="fixed inset-0 z-40" onClick={() => setActiveHelpColId(null)} />
-                      <div className="absolute left-0 mt-6 w-64 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl p-3 z-50 text-xs text-slate-200 animate-in fade-in slide-in-from-top-2 duration-150">
+                      <div className="fixed inset-0 z-45 pointer-events-auto" onClick={(e) => { e.stopPropagation(); setActiveHelpColId(null); }} />
+                      <div className="absolute left-0 top-full mt-2 w-64 bg-slate-900 border border-slate-700/80 rounded-xl shadow-2xl p-3 z-50 text-xs text-slate-200 animate-in fade-in slide-in-from-top-2 duration-150 pointer-events-auto">
                         <div className="flex justify-between items-start mb-1.5">
                           <span className="font-bold text-[10px] uppercase text-primary tracking-wider">Sobre esta etapa</span>
-                          <button onClick={() => setActiveHelpColId(null)} className="text-foreground/45 hover:text-foreground text-[10px]">✕</button>
+                          <button onClick={(e) => { e.stopPropagation(); setActiveHelpColId(null); }} className="text-foreground/45 hover:text-foreground text-[10px] p-0.5">✕</button>
                         </div>
                         <p className="leading-relaxed font-medium">{col.help}</p>
                       </div>
@@ -253,27 +304,22 @@ export function KanbanBoard() {
                 </span>
               </div>
 
-            {/* Área de Cards (rolagem vertical interna independente) */}
-            <div className="flex-1 p-3 space-y-3 overflow-y-auto">
-              {colLeads.map((lead) => {
-                const leadTags = lead.tags ? lead.tags.split(',') : [];
-                return (
-                  <div 
-                    key={lead.id} 
-                    draggable
-                    onDragStart={(e) => handleDragStart(e, lead.id)}
-                    onClick={() => openLeadDetails(lead)}
-                    className="bg-card border border-border p-3 rounded-xl shadow-sm hover:shadow-md hover:border-primary/40 active:border-primary transition-all cursor-grab active:cursor-grabbing group relative overflow-hidden"
-                  >
-                    <div className="absolute top-0 left-0 w-1.5 h-full bg-border group-hover:bg-primary transition-colors shrink-0"></div>
-                    
-                    <div className="flex justify-between items-start mb-1 pl-2">
-                      <div className="flex items-center space-x-2 max-w-[85%]">
-                        {/* Removido prioridade e origem */}
-                      </div>
-
-                      {/* Botão de Transição Touch / Mobile-Friendly */}
-                      <div className="relative shrink-0">
+              {/* Área de Cards (rolagem vertical interna independente) */}
+              <div className="flex-1 p-3 space-y-3 overflow-y-auto">
+                {colLeads.map((lead) => {
+                  const leadTags = lead.tags ? lead.tags.split(',') : [];
+                  return (
+                    <div 
+                      key={lead.id} 
+                      draggable
+                      onDragStart={(e) => handleDragStart(e, lead.id)}
+                      onClick={() => openLeadDetails(lead)}
+                      className="bg-card border border-border p-2.5 rounded-xl shadow-sm hover:shadow-md hover:border-primary/40 active:border-primary transition-all cursor-grab active:cursor-grabbing group relative overflow-hidden"
+                    >
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-border group-hover:bg-primary transition-colors shrink-0"></div>
+                      
+                      {/* Botão de Transição Touch / Mobile-Friendly Absoluto */}
+                      <div className="absolute top-2.5 right-2 shrink-0 z-10">
                         <button 
                           onClick={(e) => {
                             e.stopPropagation(); // Evita abrir o drawer do lead
@@ -282,7 +328,7 @@ export function KanbanBoard() {
                           className="p-1 hover:bg-foreground/5 rounded-full transition-all text-foreground/30 hover:text-foreground cursor-pointer"
                           title="Alterar fase do lead"
                         >
-                          <MoreVertical size={14} />
+                          <MoreVertical size={13} />
                         </button>
                         
                         {activeMenuLeadId === lead.id && (
@@ -301,8 +347,8 @@ export function KanbanBoard() {
                                       setActiveMenuLeadId(null);
                                       if (phase.id === lead.status) return;
                                       
-                                      // Intercepta para colunas de fechamento
-                                      if (phase.id === 'venda_realizada' || phase.id === 'venda_perdida') {
+                                      // Intercepta para colunas de fechamento e distribuição externa
+                                      if (phase.id === 'venda_realizada' || phase.id === 'venda_perdida' || phase.id === 'distribuido') {
                                         setOutcomeForm({});
                                         setOutcomeModal({ isOpen: true, type: phase.id, leadId: lead.id });
                                         return;
@@ -335,58 +381,60 @@ export function KanbanBoard() {
                           </>
                         )}
                       </div>
-                    </div>
-                    
-                    <div className="pl-2">
-                      <h4 className="font-bold text-xs text-foreground/90 group-hover:text-primary transition-colors truncate" title={lead.name}>
-                        {lead.name}
-                      </h4>
                       
-                      <p className="text-[11px] text-foreground/60 mt-1 flex items-center truncate" title={lead.company || lead.source}>
-                        <Briefcase size={12} className="mr-1 shrink-0 text-foreground/40" /> {lead.company || 'Pessoa Física'}
-                      </p>
+                      <div className="pl-1.5 pr-4 space-y-0.5">
+                        <h4 className="font-bold text-xs text-foreground/90 group-hover:text-primary transition-colors truncate" title={lead.name}>
+                          {lead.name}
+                        </h4>
+                        
+                        <p className="text-[10px] text-foreground/60 flex items-center truncate" title={lead.company || lead.source}>
+                          <Briefcase size={11} className="mr-1 shrink-0 text-foreground/40" /> {lead.company || 'Pessoa Física'}
+                        </p>
 
-                      <p className="text-[11px] text-foreground/60 mt-0.5 flex items-center font-semibold truncate text-primary" title={lead.product_interest || ''}>
-                        <Tag size={12} className="mr-1 shrink-0 text-primary/70" /> {lead.product_interest || 'Sem veículo de interesse'}
-                      </p>
+                        <p className="text-[10px] text-foreground/60 flex items-center font-semibold truncate text-primary" title={lead.product_interest || ''}>
+                          <Tag size={11} className="mr-1 shrink-0 text-primary/70" /> {lead.product_interest || 'Sem veículo de interesse'}
+                        </p>
 
-                      {/* Rodapé do Card */}
-                      <div className="flex justify-between items-center mt-2.5 pt-2 border-t border-border">
-                        <div className="flex items-center space-x-1" title="Vendedor Atribuído">
-                          <UserIcon size={12} className="text-foreground/40" />
-                          <span className="text-[10px] text-foreground/60 font-medium truncate max-w-[120px]">
-                            {lead.assigned_to_id ? (users.find(u => u.id === lead.assigned_to_id)?.name || 'Desconhecido') : 'Sem vendedor'}
-                          </span>
-                        </div>
-                        <div className="flex text-foreground/40 items-center space-x-1 text-[10px]" title="Tempo sem atualização">
-                          <Clock size={11} />
-                          <span>
-                            {(() => {
-                              const updatedAt = lead.updated_at || lead.created_at || new Date().toISOString();
-                              const diffDays = Math.floor((new Date().getTime() - new Date(updatedAt).getTime()) / (1000 * 3600 * 24));
-                              return diffDays <= 0 ? 'Hoje' : `${diffDays} d atrás`;
-                            })()}
-                          </span>
+                        {/* Rodapé do Card */}
+                        <div className="flex justify-between items-center mt-2.5 pt-1.5 border-t border-border">
+                          <div className="flex flex-col space-y-0.5" title="Responsáveis pelo Lead">
+                            <div className="flex items-center space-x-1" title="Vendedor Interno">
+                              <UserIcon size={10} className="text-foreground/40" />
+                              <span className="text-[9px] text-foreground/60 font-semibold truncate max-w-[110px]">
+                                {lead.assigned_to_id ? (users.find(u => u.id === lead.assigned_to_id)?.name || 'Desconhecido') : 'Sem vendedor'}
+                              </span>
+                            </div>
+                            {lead.external_seller_name && (
+                              <div className="flex items-center space-x-1" title={`Vendedor Externo - Depto: ${lead.external_department || 'N/A'}, Revenda: ${lead.external_dealer || 'N/A'}`}>
+                                <Users size={10} className="text-primary animate-pulse shrink-0" />
+                                <span className="text-[9px] text-primary font-extrabold truncate max-w-[110px]">
+                                  Ext: {lead.external_seller_name}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex text-foreground/40 items-center space-x-1 text-[9px]" title="Tempo sem atualização">
+                            <Clock size={10} />
+                            <span>
+                              {(() => {
+                                const updatedAt = lead.updated_at || lead.created_at || new Date().toISOString();
+                                const diffDays = Math.floor((new Date().getTime() - new Date(updatedAt).getTime()) / (1000 * 3600 * 24));
+                                return diffDays <= 0 ? 'Hoje' : `${diffDays} d atrás`;
+                              })()}
+                            </span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
               
               {colLeads.length === 0 && (
                 <div className="text-center p-8 text-xs text-foreground/40 border border-dashed border-border bg-card/40 rounded-xl">
                   Nenhum lead nesta etapa comercial
                 </div>
               )}
-            </div>
-          </div>
-        );
-      })}
-      
-      </div>
-
-      {/* Drawer do Lead Selecionado */}
+                  {/* Drawer do Lead Selecionado */}
       <LeadDrawer 
         isOpen={isDrawerOpen} 
         onClose={() => {
@@ -397,13 +445,29 @@ export function KanbanBoard() {
         onLeadUpdated={fetchLeads} 
       />
 
-      {/* MODAL DE OUTCOME (VENDA REALIZADA / PERDIDA) */}
+      {/* MODAL DE OUTCOME (VENDA REALIZADA / PERDIDA / DISTRIBUÍDO) */}
       {outcomeModal.isOpen && (
         <div className="fixed inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl border border-border overflow-hidden">
-            <div className={`p-4 border-b border-border flex justify-between items-center ${outcomeModal.type === 'venda_realizada' ? 'bg-emerald-500/10' : 'bg-red-500/10'}`}>
-              <h2 className={`font-bold ${outcomeModal.type === 'venda_realizada' ? 'text-emerald-500' : 'text-red-500'}`}>
-                {outcomeModal.type === 'venda_realizada' ? '🎉 Registrar Venda Realizada' : '📉 Registrar Venda Perdida'}
+          <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl border border-border overflow-hidden animate-in zoom-in-95 duration-150">
+            <div className={`p-4 border-b border-border flex justify-between items-center ${
+              outcomeModal.type === 'venda_realizada' 
+                ? 'bg-emerald-500/10' 
+                : outcomeModal.type === 'distribuido'
+                ? 'bg-primary/10'
+                : 'bg-red-500/10'
+            }`}>
+              <h2 className={`font-bold ${
+                outcomeModal.type === 'venda_realizada' 
+                  ? 'text-emerald-500' 
+                  : outcomeModal.type === 'distribuido'
+                  ? 'text-primary'
+                  : 'text-red-500'
+              }`}>
+                {outcomeModal.type === 'venda_realizada' 
+                  ? '🎉 Registrar Venda Realizada' 
+                  : outcomeModal.type === 'distribuido'
+                  ? '🤝 Indicar / Distribuir Lead Externo'
+                  : '📉 Registrar Venda Perdida'}
               </h2>
               <button onClick={() => setOutcomeModal({ isOpen: false, type: null, leadId: null })} className="text-foreground/50 hover:text-foreground">
                 <X size={20} />
@@ -537,6 +601,42 @@ export function KanbanBoard() {
                 </>
               )}
 
+              {outcomeModal.type === 'distribuido' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground/70 mb-1">Nome do Vendedor Externo *</label>
+                    <input 
+                      type="text"
+                      required
+                      value={outcomeForm.external_seller_name || ''}
+                      onChange={e => setOutcomeForm({...outcomeForm, external_seller_name: e.target.value})}
+                      className="w-full bg-foreground/5 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Ex: Carlos Silva"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground/70 mb-1">Departamento / Linha de Produto</label>
+                    <input 
+                      type="text"
+                      value={outcomeForm.external_department || ''}
+                      onChange={e => setOutcomeForm({...outcomeForm, external_department: e.target.value})}
+                      className="w-full bg-foreground/5 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Ex: Vans, Caminhões Novos, Peças"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-foreground/70 mb-1">Revenda / Filial Comercial</label>
+                    <input 
+                      type="text"
+                      value={outcomeForm.external_dealer || ''}
+                      onChange={e => setOutcomeForm({...outcomeForm, external_dealer: e.target.value})}
+                      className="w-full bg-foreground/5 border border-border rounded-lg px-3 py-2 text-sm text-foreground focus:ring-1 focus:ring-primary outline-none"
+                      placeholder="Ex: De Nigris Limão, De Nigris SBC"
+                    />
+                  </div>
+                </>
+              )}
+
               <div className="mt-6 flex justify-end space-x-3 pt-4 border-t border-border">
                 <button 
                   type="button" 
@@ -549,10 +649,14 @@ export function KanbanBoard() {
                   type="submit" 
                   disabled={loading}
                   className={`px-6 py-2 rounded-lg text-sm font-bold text-white shadow-md transition-all ${
-                    outcomeModal.type === 'venda_realizada' ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'
+                    outcomeModal.type === 'venda_realizada' 
+                      ? 'bg-emerald-500 hover:bg-emerald-600' 
+                      : outcomeModal.type === 'distribuido'
+                      ? 'bg-primary hover:bg-primary/90 shadow-primary/20'
+                      : 'bg-red-500 hover:bg-red-600'
                   }`}
                 >
-                  {loading ? 'Salvando...' : 'Confirmar Encerramento'}
+                  {loading ? 'Salvando...' : outcomeModal.type === 'distribuido' ? 'Confirmar Indicação' : 'Confirmar Encerramento'}
                 </button>
               </div>
             </form>

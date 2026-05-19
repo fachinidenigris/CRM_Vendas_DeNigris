@@ -99,6 +99,9 @@ def run_migrations():
             ("sale_product", "VARCHAR"),
             ("sale_model", "VARCHAR"),
             ("is_archived", "BOOLEAN DEFAULT FALSE"),
+            ("external_seller_name", "VARCHAR"),
+            ("external_department", "VARCHAR"),
+            ("external_dealer", "VARCHAR"),
         ]
         for col_name, col_type in new_lead_columns:
             if col_name not in lead_columns:

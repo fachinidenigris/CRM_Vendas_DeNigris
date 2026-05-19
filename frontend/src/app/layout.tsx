@@ -4,7 +4,7 @@ import './globals.css';
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Users, Terminal, Kanban, Calendar, Shield, User, RefreshCw, UserCheck, Lock, Mail, Key, LogOut, Eye, EyeOff, Archive, BarChart2, Megaphone } from 'lucide-react';
+import { Users, Terminal, Kanban, Calendar, Shield, User, RefreshCw, UserCheck, Lock, Mail, Key, LogOut, Eye, EyeOff, Archive, BarChart2, Megaphone, Shuffle, ChevronLeft, ChevronRight } from 'lucide-react';
 import { api, User as UserType } from '@/lib/api';
 
 export default function RootLayout({
@@ -27,6 +27,23 @@ export default function RootLayout({
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotLoading, setForgotLoading] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Inicializa o estado do localStorage assim que o componente é montado no client
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const isCollapsed = localStorage.getItem('crm_sidebar_collapsed') === 'true';
+      setSidebarCollapsed(isCollapsed);
+    }
+  }, []);
+
+  const toggleSidebar = () => {
+    const nextState = !sidebarCollapsed;
+    setSidebarCollapsed(nextState);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('crm_sidebar_collapsed', String(nextState));
+    }
+  };
 
   // Carregar os usuários do backend e validar a sessão atual
   const loadSession = async () => {
@@ -348,105 +365,166 @@ export default function RootLayout({
         <div className="flex h-screen overflow-hidden">
           
           {/* Menu Lateral Fixo */}
-          <aside className="w-64 border-r border-border bg-card flex flex-col p-4 shrink-0 justify-between select-none">
+          <aside className={`border-r border-border bg-card flex flex-col p-4 shrink-0 justify-between select-none transition-all duration-300 ${sidebarCollapsed ? 'w-20' : 'w-64'}`}>
             <div className="space-y-6">
               
               {/* Branding da Empresa no Topo */}
-              <div className="flex items-center space-x-3 px-3 py-1">
-                {/* Ícone de D e N em SVG Premium */}
-                <svg viewBox="0 0 200 200" className="w-8 h-8 rounded-lg shadow" fill="none">
-                  <rect width="200" height="200" rx="48" fill="url(#denigrisGradSmall)" />
-                  <path d="M55 50 H95 C130 50 150 70 150 100 C150 130 130 150 95 150 H55 V50 Z" stroke="white" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M55 80 H80 V120 H55 V80 Z" fill="#2E4A9E" rx="8" />
-                  <defs>
-                    <linearGradient id="denigrisGradSmall" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
-                      <stop stopColor="#0B1C3F"/>
-                      <stop stopColor="#070E1C"/>
-                    </linearGradient>
-                  </defs>
-                </svg>
-                <div className="flex flex-col">
-                  <h1 className="text-sm font-bold tracking-tight leading-none text-foreground">De Nigris CRM</h1>
-                  <span className="text-[9px] uppercase font-bold tracking-widest text-foreground/45 mt-0.5">Mercedes-Benz</span>
+              <div className="flex items-center justify-between px-3 py-1 mb-2">
+                <div className={`flex items-center ${sidebarCollapsed ? 'justify-center w-full' : 'space-x-3'}`}>
+                  {/* Ícone de D e N em SVG Premium */}
+                  <svg viewBox="0 0 200 200" className="w-8 h-8 rounded-lg shadow shrink-0" fill="none">
+                    <rect width="200" height="200" rx="48" fill="url(#denigrisGradSmall)" />
+                    <path d="M55 50 H95 C130 50 150 70 150 100 C150 130 130 150 95 150 H55 V50 Z" stroke="white" strokeWidth="16" strokeLinecap="round" strokeLinejoin="round"/>
+                    <path d="M55 80 H80 V120 H55 V80 Z" fill="#2E4A9E" rx="8" />
+                    <defs>
+                      <linearGradient id="denigrisGradSmall" x1="0" y1="0" x2="200" y2="200" gradientUnits="userSpaceOnUse">
+                        <stop stopColor="#0B1C3F"/>
+                        <stop stopColor="#070E1C"/>
+                      </linearGradient>
+                    </defs>
+                  </svg>
+                  {!sidebarCollapsed && (
+                    <div className="flex flex-col animate-in fade-in duration-200">
+                      <h1 className="text-sm font-bold tracking-tight leading-none text-foreground">De Nigris CRM</h1>
+                      <span className="text-[9px] uppercase font-bold tracking-widest text-foreground/45 mt-0.5">Mercedes-Benz</span>
+                    </div>
+                  )}
                 </div>
+                {!sidebarCollapsed && (
+                  <button 
+                    onClick={toggleSidebar} 
+                    className="text-foreground/40 hover:text-foreground p-1 hover:bg-foreground/5 rounded-lg transition-all cursor-pointer"
+                    title="Recolher menu lateral"
+                  >
+                    <ChevronLeft size={16} />
+                  </button>
+                )}
               </div>
+
+              {sidebarCollapsed && (
+                <div className="flex justify-center -mt-2">
+                  <button 
+                    onClick={toggleSidebar} 
+                    className="text-foreground/40 hover:text-foreground p-1 hover:bg-foreground/5 rounded-lg transition-all w-8 h-8 flex items-center justify-center cursor-pointer"
+                    title="Expandir menu lateral"
+                  >
+                    <ChevronRight size={16} />
+                  </button>
+                </div>
+              )}
 
               {/* Navegação por Perfil */}
               <nav className="space-y-1">
                 {/* Link: Agenda / Hoje (Disponível para todos os perfis) */}
                 <Link 
                   href="/" 
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  title={sidebarCollapsed ? "Agenda / Hoje" : undefined}
+                  className={`flex items-center rounded-lg text-sm font-semibold transition-all ${
+                    sidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2'
+                  } ${
                     pathname === '/' 
                       ? 'bg-primary text-primary-foreground shadow-sm' 
                       : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                   }`}
                 >
-                  <Calendar size={18} />
-                  <span>Agenda / Hoje</span>
+                  <Calendar size={18} className="shrink-0" />
+                  {!sidebarCollapsed && <span className="animate-in fade-in duration-200">Agenda / Hoje</span>}
                 </Link>
 
                 {/* Link: Kanban (Disponível para todos os perfis) */}
                 <Link 
                   href="/kanban" 
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  title={sidebarCollapsed ? "Kanban" : undefined}
+                  className={`flex items-center rounded-lg text-sm font-semibold transition-all ${
+                    sidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2'
+                  } ${
                     pathname === '/kanban' 
                       ? 'bg-primary text-primary-foreground shadow-sm' 
                       : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                   }`}
                 >
-                  <Kanban size={18} />
-                  <span>Kanban</span>
+                  <Kanban size={18} className="shrink-0" />
+                  {!sidebarCollapsed && <span className="animate-in fade-in duration-200">Kanban</span>}
                 </Link>
 
                 <Link 
                   href="/historico" 
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  title={sidebarCollapsed ? "Histórico / Arquivados" : undefined}
+                  className={`flex items-center rounded-lg text-sm font-semibold transition-all ${
+                    sidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2'
+                  } ${
                     pathname === '/historico' 
                       ? 'bg-primary text-primary-foreground shadow-sm' 
                       : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                   }`}
                 >
-                  <Archive size={18} />
-                  <span>Histórico / Arquivados</span>
+                  <Archive size={18} className="shrink-0" />
+                  {!sidebarCollapsed && <span className="animate-in fade-in duration-200">Histórico / Arquivados</span>}
                 </Link>
 
                 <Link 
                   href="/relatorios" 
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  title={sidebarCollapsed ? "Relatórios & Indicadores" : undefined}
+                  className={`flex items-center rounded-lg text-sm font-semibold transition-all ${
+                    sidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2'
+                  } ${
                     pathname === '/relatorios' 
                       ? 'bg-primary text-primary-foreground shadow-sm' 
                       : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                   }`}
                 >
-                  <BarChart2 size={18} />
-                  <span>Relatórios & Indicadores</span>
+                  <BarChart2 size={18} className="shrink-0" />
+                  {!sidebarCollapsed && <span className="animate-in fade-in duration-200">Relatórios & Indicadores</span>}
                 </Link>
 
                 <Link 
                   href="/marketing" 
-                  className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                  title={sidebarCollapsed ? "Automação de Marketing" : undefined}
+                  className={`flex items-center rounded-lg text-sm font-semibold transition-all ${
+                    sidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2'
+                  } ${
                     pathname === '/marketing' 
                       ? 'bg-primary text-primary-foreground shadow-sm' 
                       : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                   }`}
                 >
-                  <Megaphone size={18} />
-                  <span>Automação de Marketing</span>
+                  <Megaphone size={18} className="shrink-0" />
+                  {!sidebarCollapsed && <span className="animate-in fade-in duration-200">Automação de Marketing</span>}
                 </Link>
 
                 {/* Link: Equipes & Usuários (Indisponível para Vendedor) */}
                 {(isAdmin || isGestor) && (
                   <Link 
                     href="/settings" 
-                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    title={sidebarCollapsed ? "Equipes & Usuários" : undefined}
+                    className={`flex items-center rounded-lg text-sm font-semibold transition-all ${
+                      sidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2'
+                    } ${
                       pathname === '/settings' 
                         ? 'bg-primary text-primary-foreground shadow-sm' 
                         : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                     }`}
                   >
-                    <Users size={18} />
-                    <span>Equipes & Usuários</span>
+                    <Users size={18} className="shrink-0" />
+                    {!sidebarCollapsed && <span className="animate-in fade-in duration-200">Equipes & Usuários</span>}
+                  </Link>
+                )}
+
+                {/* Link: Regras de Distribuição (Apenas Admin/Diretoria) */}
+                {isAdmin && (
+                  <Link 
+                    href="/distribuicao" 
+                    title={sidebarCollapsed ? "Regras de Distribuição" : undefined}
+                    className={`flex items-center rounded-lg text-sm font-semibold transition-all ${
+                      sidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2'
+                    } ${
+                      pathname === '/distribuicao' 
+                        ? 'bg-primary text-primary-foreground shadow-sm' 
+                        : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
+                    }`}
+                  >
+                    <Shuffle size={18} className="shrink-0" />
+                    {!sidebarCollapsed && <span className="animate-in fade-in duration-200">Regras de Distribuição</span>}
                   </Link>
                 )}
 
@@ -454,14 +532,17 @@ export default function RootLayout({
                 {isAdmin && (
                   <Link 
                     href="/logs" 
-                    className={`flex items-center space-x-3 px-3 py-2 rounded-lg text-sm font-semibold transition-all ${
+                    title={sidebarCollapsed ? "Logs Comerciais" : undefined}
+                    className={`flex items-center rounded-lg text-sm font-semibold transition-all ${
+                      sidebarCollapsed ? 'justify-center p-2.5' : 'space-x-3 px-3 py-2'
+                    } ${
                       pathname === '/logs' 
                         ? 'bg-primary text-primary-foreground shadow-sm' 
                         : 'text-foreground/70 hover:bg-foreground/5 hover:text-foreground'
                     }`}
                   >
-                    <Terminal size={18} />
-                    <span>Logs Comerciais</span>
+                    <Terminal size={18} className="shrink-0" />
+                    {!sidebarCollapsed && <span className="animate-in fade-in duration-200">Logs Comerciais</span>}
                   </Link>
                 )}
               </nav>
@@ -471,7 +552,7 @@ export default function RootLayout({
             <div className="border-t border-border/60 pt-4 mt-auto space-y-4">
               
               {/* Simulador de Perfis (Disponível apenas para Administradores da Diretoria) */}
-              {isAdmin && users.length > 0 && activeUser && (
+              {!sidebarCollapsed && isAdmin && users.length > 0 && activeUser && (
                 <div className="space-y-1">
                   <label className="text-[10px] uppercase font-bold text-foreground/45 tracking-wider block pl-1">
                     Simulador de Perfis (Auditoria)
@@ -491,44 +572,51 @@ export default function RootLayout({
               )}
 
               {/* Informações da Sessão Ativa */}
-              <div className="flex items-center justify-between pl-1 bg-foreground/[0.02] p-2 rounded-lg border border-border/40">
-                <div className="flex flex-col">
-                  <span className="text-[10px] text-foreground/40 font-bold uppercase tracking-wider leading-none">
-                    Perfil
-                  </span>
-                  <span className="text-xs font-semibold text-primary flex items-center mt-1">
-                    {activeUser?.role === 'admin' && <Shield className="inline mr-1 text-slate-400" size={11} />}
-                    {activeUser?.role === 'gestor' && <UserCheck className="inline mr-1" size={11} />}
-                    {activeUser?.role === 'vendedor' && <User className="inline mr-1" size={11} />}
-                    {activeUser?.role === 'admin' ? 'Diretor' : activeUser?.role === 'gestor' ? 'Gestor' : 'Vendedor'}
-                  </span>
-                  <span className="text-[10px] text-foreground/60 mt-0.5 max-w-[120px] truncate font-medium">
-                    {activeUser?.name}
-                  </span>
+              <div className={`flex ${sidebarCollapsed ? 'flex-col items-center space-y-3 py-3 px-1' : 'items-center justify-between p-2 pl-1'} bg-foreground/[0.02] rounded-lg border border-border/40`}>
+                <div className={`flex ${sidebarCollapsed ? 'flex-col items-center text-center' : 'flex-col'}`}>
+                  {sidebarCollapsed ? (
+                    <div title={`${activeUser?.name} (${activeUser?.role === 'admin' ? 'Diretor' : activeUser?.role === 'gestor' ? 'Gestor' : 'Vendedor'})`}>
+                      {activeUser?.role === 'admin' && <Shield className="text-slate-400" size={18} />}
+                      {activeUser?.role === 'gestor' && <UserCheck className="text-primary" size={18} />}
+                      {activeUser?.role === 'vendedor' && <User className="text-primary" size={18} />}
+                    </div>
+                  ) : (
+                    <>
+                      <span className="text-[10px] text-foreground/40 font-bold uppercase tracking-wider leading-none">
+                        Perfil
+                      </span>
+                      <span className="text-xs font-semibold text-primary flex items-center mt-1">
+                        {activeUser?.role === 'admin' && <Shield className="inline mr-1 text-slate-400" size={11} />}
+                        {activeUser?.role === 'gestor' && <UserCheck className="inline mr-1" size={11} />}
+                        {activeUser?.role === 'vendedor' && <User className="inline mr-1" size={11} />}
+                        {activeUser?.role === 'admin' ? 'Diretor' : activeUser?.role === 'gestor' ? 'Gestor' : 'Vendedor'}
+                      </span>
+                      <span className="text-[10px] text-foreground/60 mt-0.5 max-w-[120px] truncate font-medium">
+                        {activeUser?.name}
+                      </span>
+                    </>
+                  )}
                 </div>
 
-                <div className="flex items-center space-x-2">
+                <div className={`flex ${sidebarCollapsed ? 'flex-col items-center space-y-2' : 'items-center space-x-2'}`}>
                   {activeUser?.role === 'vendedor' ? (
                     <button
                       onClick={handleToggleMyPause}
-                      className={`text-[9px] px-2 py-0.5 rounded-full font-bold border transition-colors cursor-pointer ${
+                      className={`text-[9px] px-1.5 py-0.5 rounded-full font-bold border transition-colors cursor-pointer shrink-0 ${
                         activeUser?.is_paused 
                           ? 'bg-amber-500/10 text-amber-500 border-amber-500/25 hover:bg-amber-500/20' 
                           : 'bg-emerald-500/10 text-emerald-500 border-emerald-500/25 hover:bg-emerald-500/20'
                       }`}
                       title={activeUser?.is_paused ? "Você está ausente. Clique para voltar a receber leads." : "Você está ativo no rodízio. Clique para pausar."}
                     >
-                      {activeUser?.is_paused ? '⏸️ Pausado' : '▶️ Ativo'}
+                      {activeUser?.is_paused ? '⏸️' : '▶️'}
                     </button>
                   ) : (
-                    <div 
-                      className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" 
-                      title="Administração/Gestão" 
-                    />
+                    !sidebarCollapsed && <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0" title="Administração/Gestão" />
                   )}
                   <button
                     onClick={handleLogout}
-                    className="text-foreground/45 hover:text-red-400 p-1.5 rounded-md hover:bg-red-500/10 transition-all"
+                    className="text-foreground/45 hover:text-red-400 p-1.5 rounded-md hover:bg-red-500/10 transition-all cursor-pointer shrink-0"
                     title="Encerrar Sessão"
                   >
                     <LogOut size={14} />
