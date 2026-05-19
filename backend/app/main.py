@@ -36,8 +36,8 @@ def run_migrations():
             raw_conn.autocommit = True
             cursor = raw_conn.cursor()
 
-            def migrate_col_to_varchar(table: str, column: str):
-                """Converte coluna ENUM para VARCHAR se necessário. Operação idempotente."""
+            def migrate_col_to_varchar(table: str, column: str, default_val: str):
+                """Converte coluna ENUM para VARCHAR se necessário, removendo e restaurando default no PostgreSQL."""
                 cursor.execute(
                     "SELECT data_type FROM information_schema.columns WHERE table_name=%s AND column_name=%s;",
                     (table, column)
@@ -50,14 +50,17 @@ def run_migrations():
                 print(f"[MIGRATION-PG] {table}.{column}: tipo='{data_type}'")
                 if data_type == "USER-DEFINED":
                     print(f"[MIGRATION-PG] Convertendo {table}.{column} ENUM -> VARCHAR...")
-                    cursor.execute(
-                        f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR USING {column}::text"
-                    )
-                    print(f"[MIGRATION-PG] ✅ {table}.{column} convertida para VARCHAR!")
+                    # 1. Remover o default antigo para evitar bloqueio de tipo
+                    cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} DROP DEFAULT;")
+                    # 2. Converter o tipo de coluna
+                    cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} TYPE VARCHAR USING {column}::text;")
+                    # 3. Adicionar o novo default como VARCHAR
+                    cursor.execute(f"ALTER TABLE {table} ALTER COLUMN {column} SET DEFAULT '{default_val}';")
+                    print(f"[MIGRATION-PG] ✅ {table}.{column} convertida para VARCHAR com sucesso!")
 
-            migrate_col_to_varchar("leads", "status")
-            migrate_col_to_varchar("leads", "priority")
-            migrate_col_to_varchar("tasks", "task_type")
+            migrate_col_to_varchar("leads", "status", "novo")
+            migrate_col_to_varchar("leads", "priority", "media")
+            migrate_col_to_varchar("tasks", "task_type", "outro")
 
             cursor.close()
             print("[MIGRATION-PG] ✅ Bloco 1 concluído.")
