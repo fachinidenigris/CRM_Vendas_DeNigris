@@ -35,5 +35,7 @@ Este arquivo registra e rastreia o andamento de todas as tarefas comerciais e t�
 | 25 | Registro de Regra do Mapa do Projeto em habilidade.md | ✅ Concluído | 19/05/2026 | 19/05/2026 | Adicionada a Seção 7 em `habilidade.md` obrigando a leitura pré-desenvolvimento e a atualização sistemática do `mapa_projeto.md` após modificações estruturais no código. |
 | 26 | DDL Incondicional de ENUM -> VARCHAR no PostgreSQL | ✅ Concluído | 19/05/2026 | 19/05/2026 | Alterada a migração no `main.py` para executar os comandos de alteração de tipo e default no Postgres de forma incondicional direta, eliminando consultas falhas ao `information_schema`. |
 | 27 | Rota Pública Temporária de Auditoria /debug-db-status | ✅ Concluído | 19/05/2026 | 19/05/2026 | Implementado para auditoria temporária pós-deploy e em seguida removido com sucesso para restaurar a segurança. |
-| 28 | Migração Leve baseada em ALTER TYPE para PostgreSQL | ✅ Concluído | 19/05/2026 | 19/05/2026 | Substituída a migração física pesada (ALTER TABLE) no `main.py` por comandos ALTER TYPE ADD VALUE IF NOT EXISTS, o que evita locks exclusivos de tabela no boot e resolve o erro de novos status de enum no Postgres. |
+| 28 | Migração Leve baseada em ALTER TYPE para PostgreSQL | ✅ Concluído | 19/05/2026 | 19/05/2026 | Abordagem de ALTER TYPE que foi implementada mas se provou insuficiente contra concorrência e causou novas falhas. |
+| 29 | Conversão Definitiva de Enums Físicos para VARCHAR | ✅ Concluído | 19/05/2026 | 19/05/2026 | Alteradas fisicamente as colunas de leads e tasks em produção e atualizado main.py com DDL de VARCHAR incondicional para evitar conflitos de enums no Postgres. |
+
 

@@ -24,61 +24,45 @@ def run_migrations():
     mas NUNCA derruba o processo do servidor (o CORS depende disso).
     """
     # =========================================================================
-    # BLOCO 1: Migração ENUM -> VARCHAR no PostgreSQL (Render)
-    # Usa raw_connection com autocommit — completamente fora do ORM/SQLAlchemy
-    # para evitar validação de tipo em nível de driver.
+    # BLOCO 1: Migração Física de ENUM para VARCHAR no PostgreSQL
+    # Garante portabilidade total e evita conflitos de tipos em tempo de execução.
     # =========================================================================
     if "postgresql" in str(engine.url):
         raw_conn = None
         try:
-            print("[MIGRATION-PG] Iniciando migração leve de ENUMs no PostgreSQL...")
+            print("[MIGRATION-PG] Iniciando conversão física de ENUMs para VARCHAR no PostgreSQL...")
             raw_conn = engine.raw_connection()
             raw_conn.autocommit = True
             cursor = raw_conn.cursor()
 
-            def add_enum_value_safe(enum_name: str, value: str):
-                try:
-                    cursor.execute(f"ALTER TYPE {enum_name} ADD VALUE IF NOT EXISTS '{value}';")
-                    print(f"[MIGRATION-PG] [SUCESSO] Valor '{value}' adicionado ao enum {enum_name} (ou já existente).")
-                except Exception as e:
-                    print(f"[MIGRATION-PG] [AVISO] Falha ao adicionar '{value}' ao enum {enum_name}: {e}")
+            # Define lock_timeout curto para evitar deadlocks de boot concorrentes no Render
+            cursor.execute("SET lock_timeout = '5s';")
 
-            # Status de Leads
-            add_enum_value_safe("leadstatusenum", "novo")
-            add_enum_value_safe("leadstatusenum", "qualificacao")
-            add_enum_value_safe("leadstatusenum", "distribuido")
-            add_enum_value_safe("leadstatusenum", "venda_realizada")
-            add_enum_value_safe("leadstatusenum", "venda_perdida")
+            # 1. Converter leads.status
+            try:
+                cursor.execute("ALTER TABLE leads ALTER COLUMN status TYPE VARCHAR(255) USING status::varchar;")
+                print("[MIGRATION-PG] [SUCESSO] leads.status convertido para VARCHAR.")
+            except Exception as e:
+                print(f"[MIGRATION-PG] [AVISO] Falha ao converter leads.status: {e}")
 
-            # Prioridades
-            add_enum_value_safe("priorityenum", "baixa")
-            add_enum_value_safe("priorityenum", "media")
-            add_enum_value_safe("priorityenum", "alta")
-            add_enum_value_safe("priorityenum", "critica")
+            # 2. Converter leads.priority
+            try:
+                cursor.execute("ALTER TABLE leads ALTER COLUMN priority TYPE VARCHAR(255) USING priority::varchar;")
+                print("[MIGRATION-PG] [SUCESSO] leads.priority convertido para VARCHAR.")
+            except Exception as e:
+                print(f"[MIGRATION-PG] [AVISO] Falha ao converter leads.priority: {e}")
 
-            # Tipos de Tarefas
-            add_enum_value_safe("tasktypeenum", "ligacao")
-            add_enum_value_safe("tasktypeenum", "email")
-            add_enum_value_safe("tasktypeenum", "whatsapp")
-            add_enum_value_safe("tasktypeenum", "reuniao")
-            add_enum_value_safe("tasktypeenum", "outro")
+            # 3. Converter tasks.task_type
+            try:
+                cursor.execute("ALTER TABLE tasks ALTER COLUMN task_type TYPE VARCHAR(255) USING task_type::varchar;")
+                print("[MIGRATION-PG] [SUCESSO] tasks.task_type convertido para VARCHAR.")
+            except Exception as e:
+                print(f"[MIGRATION-PG] [AVISO] Falha ao converter tasks.task_type: {e}")
 
             cursor.close()
-            print("[MIGRATION-PG] Bloco 1 leve concluido.")
+            print("[MIGRATION-PG] Bloco 1 de migração VARCHAR concluído.")
         except Exception as err:
-            print(f"[MIGRATION-PG] [ERRO] Bloco 1 (ENUM leve): {err}")
-            try:
-                db_log = SessionLocal()
-                log_entry = models.SystemLog(
-                    log_type="ERROR",
-                    source="MIGRATION_PG",
-                    message=f"Falha ao migrar ENUMs no Postgres: {str(err)}"
-                )
-                db_log.add(log_entry)
-                db_log.commit()
-                db_log.close()
-            except Exception as log_err:
-                print(f"[MIGRATION-PG] Erro ao gravar log de falha no banco: {log_err}")
+            print(f"[MIGRATION-PG] [ERRO] Bloco 1 (migração VARCHAR): {err}")
         finally:
             if raw_conn:
                 try:
