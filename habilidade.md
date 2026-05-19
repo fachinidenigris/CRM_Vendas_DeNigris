@@ -37,3 +37,7 @@ graph TD
 
 ### 5. Atualização de Progresso
 *   **Ação:** Atualizar o arquivo `task.md`, marcando a tarefa concluída com a data e observações técnicas relevantes antes de seguir para o próximo item.
+
+### 6. Protocolo de Pré-Commit e Revisão
+*   **Regra de Ouro:** Sempre antes de fazer qualquer `git commit`, você deve obrigatoriamente fazer uma revisão sistemática procurando erros que possa ter cometido ou itens que tenha esquecido de fazer.
+*   **Checklist de Validação:** Use o arquivo `task.md` como a base definitiva para este checklist. O `task.md` deve ser atualizado com as novas tarefas antes do início do desenvolvimento e atualizado novamente marcando-as como concluídas logo após o término, servindo como auditoria final pré-commit.
