@@ -120,7 +120,15 @@ def fetch_unread_emails():
                         "você possui um novo lead" in subject_clean or
                         "voce possui um novo lead" in subject_clean or
                         "intenção de compra gerada" in subject_clean or
-                        "intencao de compra gerada" in subject_clean
+                        "intencao de compra gerada" in subject_clean or
+                        # Suporte a e-mails ENCAMINHADOS (ENC: / FWD:)
+                        "enc: você possui um novo lead" in subject_clean or
+                        "enc: voce possui um novo lead" in subject_clean or
+                        "enc: intenção de compra gerada" in subject_clean or
+                        "enc: intencao de compra gerada" in subject_clean or
+                        "fwd: você possui um novo lead" in subject_clean or
+                        "fwd: voce possui um novo lead" in subject_clean or
+                        "fwd: intenção de compra gerada" in subject_clean
                     )
                     
                     if not is_lead:
@@ -142,10 +150,32 @@ def fetch_unread_emails():
                         finally:
                             db_log.close()
                         continue
-                        
-                    # 1. Processar IA (Apenas se for um lead comercial confirmado pelo assunto)
-                    ai_data = parse_email_content(f"Subject: {subject}\nSender: {sender}\n\nBody:\n{body}")
                     
+                    # Para e-mails encaminhados (ENC:/FWD:), extrair apenas o conteúdo original
+                    # Os separadores mais comuns em encaminhamentos PT-BR e EN são detectados aqui.
+                    body_to_parse = body
+                    forward_separators = [
+                        "---------- mensagem encaminhada ----------",
+                        "---------- forwarded message ----------",
+                        "de: ",  # Linha de remetente original em e-mails encaminhados do Gmail
+                        "begin forwarded message",
+                        "mensagem original",
+                        "-----original message-----",
+                    ]
+                    for sep in forward_separators:
+                        idx = body_to_parse.lower().find(sep)
+                        if idx != -1:
+                            # Pega o texto a partir do separador (conteúdo original do lead)
+                            extracted = body_to_parse[idx:]
+                            # Só substitui se o conteúdo extraído for substancialmente útil (> 100 chars)
+                            if len(extracted) > 100:
+                                body_to_parse = extracted
+                                print(f"[IMAP] E-mail encaminhado detectado. Extraindo corpo real a partir de '{sep[:30]}...'")
+                                break
+                    
+                    # Processar IA com o corpo limpo (body_to_parse já tem o conteúdo real extraído)
+                    ai_data = parse_email_content(f"Subject: {subject}\nSender: {sender}\n\nBody:\n{body_to_parse}")
+
                     if ai_data:
                         # 2. Salvar no Banco
                         db: Session = SessionLocal()
