@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     # Gemini AI
     GEMINI_API_KEY: Optional[str] = None
     
+    # Groq AI (Chave principal)
+    GROQ_API_KEY: Optional[str] = None
+    
     # Gmail IMAP
     EMAIL_USER: Optional[str] = None
     EMAIL_APP_PASSWORD: Optional[str] = None

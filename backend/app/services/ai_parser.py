@@ -30,11 +30,9 @@ class EmailParsedData(BaseModel):
 def fallback_parse_email(email_body: str) -> EmailParsedData:
     """
     Parser determinístico heurístico (regex) utilizado como fallback imediato 
-    quando a IA do Gemini falha (falta de créditos, rate limit ou indisponibilidade).
+    quando a IA do Gemini e Groq falham (falta de créditos, rate limit ou indisponibilidade).
     Garante resiliência comercial absoluta (sem perda de Leads).
     """
-    # 1. Tentar extrair do e-mail body usando padrões conhecidos
-    
     # Extrair Nome
     # Tenta obter do assunto no formato: "Você possui um novo Lead - NOME - DATA"
     subject_match = re.search(r"Subject:\s*(?:ENC:|FWD:)?\s*Você possui um novo Lead\s*-\s*([^-]+)", email_body, re.IGNORECASE)
@@ -59,7 +57,6 @@ def fallback_parse_email(email_body: str) -> EmailParsedData:
     else:
         # Tenta pegar qualquer e-mail no corpo
         all_emails = re.findall(r"([a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,})", email_body)
-        # Filtra e-mails corporativos da De Nigris se houver mais de um
         filtered_emails = [e for e in all_emails if "denigris.com.br" not in e.lower() and "google.com" not in e.lower()]
         if filtered_emails:
             email = filtered_emails[0]
@@ -67,13 +64,11 @@ def fallback_parse_email(email_body: str) -> EmailParsedData:
             email = all_emails[0]
 
     # Extrair Telefone
-    # Procura padrões de telefone BR: (XX) XXXXX-XXXX, XX XXXXX-XXXX, etc.
     phone_match = re.search(r"(?:Telefone|Celular|Whatsapp|Fone|Tel):\s*([^\n\r]+)", email_body, re.IGNORECASE)
     phone = None
     if phone_match:
         phone = phone_match.group(1).strip()
     else:
-        # Tenta achar qualquer sequência que pareça telefone BR no texto
         phone_raw = re.search(r"(\(?\d{2}\)?\s*\d{4,5}[-\s]?\d{4})", email_body)
         if phone_raw:
             phone = phone_raw.group(1).strip()
@@ -90,7 +85,6 @@ def fallback_parse_email(email_body: str) -> EmailParsedData:
     if product_match:
         product_interest = product_match.group(1).strip()
     else:
-        # Tenta procurar palavras chave comuns no texto do corpo
         body_lower = email_body.lower()
         if "sprinter" in body_lower:
             product_interest = "Sprinter (Vans)"
@@ -139,7 +133,6 @@ def fallback_parse_email(email_body: str) -> EmailParsedData:
         else:
             subcategory = "Serviços financeiros"
     else:
-        # Padrão: Veículos Novos
         category = "Veículos Novos"
         if "van" in body_lower or "sprinter" in body_lower:
             subcategory = "Vans Mercedes-Benz"
@@ -161,7 +154,7 @@ def fallback_parse_email(email_body: str) -> EmailParsedData:
         priority = "media"
         urgency_level = "Normal (Tempo de atendimento regular)"
 
-    ai_summary = f"[PARSER FALLBACK: IA INDISPONÍVEL] Lead extraído por meio de regras estáticas locais devido a limite de cota da API Gemini."
+    ai_summary = f"[PARSER FALLBACK: IA INDISPONÍVEL] Lead extraído estaticamente (fallback local) por falta de cota de nuvem."
 
     return EmailParsedData(
         name=name,
@@ -180,76 +173,186 @@ def fallback_parse_email(email_body: str) -> EmailParsedData:
     )
 
 
-def parse_email_content(email_body: str) -> Optional[EmailParsedData]:
+def parse_with_groq(email_body: str) -> Optional[EmailParsedData]:
     """
-    Usa a API do Google Gemini para extrair dados estruturados de um corpo de e-mail bruto.
-    Se falhar (por ex: falta de créditos ou limitação de taxa), cai de volta para o parser heurístico estático.
-    Garante resiliência absoluta sem parar a leitura comercial.
+    Usa a API do Groq (llama-3.1-8b-instant) para extrair dados estruturados em JSON.
+    Usa urllib nativo com User-Agent para evitar conflitos de dependências ou bloqueios do Cloudflare.
     """
-    if not settings.GEMINI_API_KEY:
-        logger.warning("GEMINI_API_KEY não configurada. Ativando parser heurístico local.")
-        return fallback_parse_email(email_body)
+    if not settings.GROQ_API_KEY:
+        logger.warning("[GROQ] Chave GROQ_API_KEY não configurada nas settings.")
+        return None
+
+    url = "https://api.groq.com/openai/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {settings.GROQ_API_KEY}",
+        "Content-Type": "application/json",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    }
+
+    prompt = f"""
+    Você é um assistente especialista em ler e-mails de leads comerciais de veículos comerciais e extrair os dados mais importantes para um sistema de CRM.
+    Leia o seguinte corpo de e-mail e extraia os dados solicitados retornando um JSON que siga perfeitamente a estrutura abaixo.
+    
+    REGRAS DE CLASSIFICAÇÃO:
+    - CATEGORIAS: Deve ser 'Veículos Novos', 'Veículos Usados', 'Locação' ou 'Produtos Agregados'.
+    - SUBCATEGORIAS:
+      * Se for caminhão novo MB -> 'Caminhões Mercedes-Benz'
+      * Se for van nova MB -> 'Vans Mercedes-Benz'
+      * Se for caminhão usado -> 'Caminhões usados'
+      * Se for van usada -> 'Vans usadas'
+      * Se for locação de caminhão -> 'Locação de Caminhões'
+      * Se for locação de van -> 'Locação de Vans'
+      * Se for seguro -> 'Seguro'
+      * Se for consórcio -> 'Consórcio'
+      * Se for plano de manutenção -> 'Plano de manutenção'
+      * Se for acessórios -> 'Acessórios'
+      * Se for serviços financeiros -> 'Serviços financeiros'
+    - CLIENT_TYPE: 'Autônomo' ou 'Frota' (identifique se mencionam CNPJ, frotista, múltiplos veículos ou compras corporativas).
+    - TAGS: Escolha dentre as tags separadas por vírgula: 'urgente', 'frota', 'autonomo', 'alto potencial', 'renovacao', 'reativacao', 'cliente ativo', 'indicacao', 'concorrencia'.
+    
+    Estrutura JSON Esperada:
+    {{
+        "name": "Nome do Lead",
+        "email": "E-mail",
+        "phone": "Telefone ou null",
+        "company": "Empresa ou null",
+        "product_interest": "Veículo ou produto de interesse",
+        "city_region": "Cidade/Região ou null",
+        "category": "Categoria comercial exata",
+        "subcategory": "Subcategoria exata",
+        "client_type": "Autônomo ou Frota",
+        "tags": "tags,separadas,por,virgula",
+        "priority": "baixa, media, alta, ou critica",
+        "urgency_level": "Breve análise da urgência baseada no tom",
+        "ai_summary": "Resumo objetivo incluindo sugestão de cross-sell pertinente (ex: oferecer seguro ou plano de manutenção para caminhões novos)"
+    }}
+    
+    Email:
+    {email_body}
+    """
+
+    data = {
+        "model": "llama-3.1-8b-instant",
+        "messages": [
+            {"role": "user", "content": prompt}
+        ],
+        "response_format": {"type": "json_object"}
+    }
+
+    import urllib.request
+    import urllib.error
+
+    req = urllib.request.Request(
+        url,
+        data=json.dumps(data).encode("utf-8"),
+        headers=headers,
+        method="POST"
+    )
 
     try:
-        genai.configure(api_key=settings.GEMINI_API_KEY)
-        
-        # Utilizando o gemini-2.5-flash
-        model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"response_mime_type": "application/json"})
-        
-        prompt = f"""
-        Você é um assistente especialista em ler e-mails de leads comerciais de veículos comerciais e extrair os dados mais importantes para um sistema de CRM.
-        Leia o seguinte corpo de e-mail e extraia os dados solicitados retornando um JSON que siga perfeitamente a estrutura abaixo.
-        
-        REGRAS DE CLASSIFICAÇÃO:
-        - CATEGORIAS: Deve ser 'Veículos Novos', 'Veículos Usados', 'Locação' ou 'Produtos Agregados'.
-        - SUBCATEGORIAS:
-          * Se for caminhão novo MB -> 'Caminhões Mercedes-Benz'
-          * Se for van nova MB -> 'Vans Mercedes-Benz'
-          * Se for caminhão usado -> 'Caminhões usados'
-          * Se for van usada -> 'Vans usadas'
-          * Se for locação de caminhão -> 'Locação de Caminhões'
-          * Se for locação de van -> 'Locação de Vans'
-          * Se for seguro -> 'Seguro'
-          * Se for consórcio -> 'Consórcio'
-          * Se for plano de manutenção -> 'Plano de manutenção'
-          * Se for acessórios -> 'Acessórios'
-          * Se for serviços financeiros -> 'Serviços financeiros'
-        - CLIENT_TYPE: 'Autônomo' ou 'Frota' (identifique se mencionam CNPJ, frotista, múltiplos veículos ou compras corporativas).
-        - TAGS: Escolha dentre as tags separadas por vírgula: 'urgente', 'frota', 'autonomo', 'alto potencial', 'renovacao', 'reativacao', 'cliente ativo', 'indicacao', 'concorrencia'.
-        
-        Estrutura JSON Esperada:
-        {{
-            "name": "Nome do Lead",
-            "email": "E-mail",
-            "phone": "Telefone ou null",
-            "company": "Empresa ou null",
-            "product_interest": "Veículo ou produto de interesse",
-            "city_region": "Cidade/Região ou null",
-            "category": "Categoria comercial exata",
-            "subcategory": "Subcategoria exata",
-            "client_type": "Autônomo ou Frota",
-            "tags": "tags,separadas,por,virgula",
-            "priority": "baixa, media, alta, ou critica",
-            "urgency_level": "Breve análise da urgência baseada no tom",
-            "ai_summary": "Resumo objetivo incluindo sugestão de cross-sell pertinente (ex: oferecer seguro ou plano de manutenção para caminhões novos)"
-        }}
-        
-        Email:
-        {email_body}
-        """
-        
-        response = model.generate_content(prompt)
-        content = response.text
-        parsed_dict = json.loads(content)
-        
-        # Validar através do Pydantic para garantir que o Gemini retornou os tipos corretos
-        data = EmailParsedData(**parsed_dict)
-        return data
-        
+        with urllib.request.urlopen(req, timeout=12) as response:
+            res_body = response.read().decode("utf-8")
+            res_json = json.loads(res_body)
+            content = res_json["choices"][0]["message"]["content"]
+            parsed_dict = json.loads(content)
+            
+            # Valida os campos com o Pydantic
+            data = EmailParsedData(**parsed_dict)
+            return data
     except Exception as e:
-        logger.error(f"Erro ao fazer parsing com IA Gemini: {e}. Acionando fallback heurístico local.")
+        logger.error(f"[GROQ] Falha na requisição da API Groq: {e}")
+        return None
+
+
+def parse_email_content(email_body: str) -> Optional[EmailParsedData]:
+    """
+    Interpreta dados estruturados de um corpo de e-mail bruto com contingencia tripla:
+    1. Tenta Groq API (Chave Principal - Llama 3.1 8B)
+    2. Tenta Gemini API (Chave Secundaria - Gemini 2.5 Flash)
+    3. Tenta Fallback Heuristico Local (Regex deterministico)
+    """
+    # =========================================================================
+    # CAMADA 1: Groq API (Principal)
+    # =========================================================================
+    if settings.GROQ_API_KEY:
+        print("[PARSER] Tentando processar com API da Groq (Principal)...")
         try:
-            return fallback_parse_email(email_body)
-        except Exception as fallback_err:
-            logger.error(f"Erro no fallback heurístico local: {fallback_err}")
-            return None
+            data = parse_with_groq(email_body)
+            if data:
+                print(f"[PARSER] [GROQ] Sucesso com API da Groq: '{data.name}'")
+                return data
+        except Exception as groq_err:
+            logger.error(f"[PARSER] Erro inesperado na chamada Groq: {groq_err}")
+
+    # =========================================================================
+    # CAMADA 2: Gemini API (Secundária)
+    # =========================================================================
+    if settings.GEMINI_API_KEY:
+        print("[PARSER] [GEMINI] Groq indisponivel. Tentando com API do Gemini (Secundaria)...")
+        try:
+            genai.configure(api_key=settings.GEMINI_API_KEY)
+            model = genai.GenerativeModel('gemini-2.5-flash', generation_config={"response_mime_type": "application/json"})
+            
+            prompt = f"""
+            Você é um assistente especialista em ler e-mails de leads comerciais de veículos comerciais e extrair os dados mais importantes para um sistema de CRM.
+            Leia o seguinte corpo de e-mail e extraia os dados solicitados retornando um JSON que siga perfeitamente a estrutura abaixo.
+            
+            REGRAS DE CLASSIFICAÇÃO:
+            - CATEGORIAS: Deve ser 'Veículos Novos', 'Veículos Usados', 'Locação' ou 'Produtos Agregados'.
+            - SUBCATEGORIAS:
+              * Se for caminhão novo MB -> 'Caminhões Mercedes-Benz'
+              * Se for van nova MB -> 'Vans Mercedes-Benz'
+              * Se for caminhão usado -> 'Caminhões usados'
+              * Se for van usada -> 'Vans usadas'
+              * Se for locação de caminhão -> 'Locação de Caminhões'
+              * Se for locação de van -> 'Locação de Vans'
+              * Se for seguro -> 'Seguro'
+              * Se for consórcio -> 'Consórcio'
+              * Se for plano de manutenção -> 'Plano de manutenção'
+              * Se for acessórios -> 'Acessórios'
+              * Se for serviços financeiros -> 'Serviços financeiros'
+            - CLIENT_TYPE: 'Autônomo' ou 'Frota' (identifique se mencionam CNPJ, frotista, múltiplos veículos ou compras corporativas).
+            - TAGS: Escolha dentre as tags separadas por vírgula: 'urgente', 'frota', 'autonomo', 'alto potencial', 'renovacao', 'reativacao', 'cliente ativo', 'indicacao', 'concorrencia'.
+            
+            Estrutura JSON Esperada:
+            {{
+                "name": "Nome do Lead",
+                "email": "E-mail",
+                "phone": "Telefone ou null",
+                "company": "Empresa ou null",
+                "product_interest": "Veículo ou produto de interesse",
+                "city_region": "Cidade/Região ou null",
+                "category": "Categoria comercial exata",
+                "subcategory": "Subcategoria exata",
+                "client_type": "Autônomo ou Frota",
+                "tags": "tags,separadas,por,virgula",
+                "priority": "baixa, media, alta, ou critica",
+                "urgency_level": "Breve análise da urgência baseada no tom",
+                "ai_summary": "Resumo objetivo incluindo sugestão de cross-sell pertinente (ex: oferecer seguro ou plano de manutenção para caminhões novos)"
+            }}
+            
+            Email:
+            {email_body}
+            """
+            response = model.generate_content(prompt)
+            content = response.text
+            parsed_dict = json.loads(content)
+            data = EmailParsedData(**parsed_dict)
+            print(f"[PARSER] [GEMINI] Sucesso com API do Gemini: '{data.name}'")
+            return data
+        except Exception as gemini_err:
+            logger.error(f"[PARSER] Erro ao fazer parsing com Gemini: {gemini_err}")
+    else:
+        print("[PARSER] Gemini não configurado ou indisponível.")
+
+    # =========================================================================
+    # CAMADA 3: Fallback Heurístico Local (Estático)
+    # =========================================================================
+    print("[PARSER] [FALLBACK] Ambas APIs de nuvem (Groq e Gemini) falharam. Acionando Fallback Heuristico Local...")
+    try:
+        data = fallback_parse_email(email_body)
+        print(f"[PARSER] [FALLBACK] Sucesso com Fallback Heuristico Local: '{data.name}'")
+        return data
+    except Exception as fallback_err:
+        logger.error(f"[PARSER] Erro crítico no fallback local: {fallback_err}")
+        return None
