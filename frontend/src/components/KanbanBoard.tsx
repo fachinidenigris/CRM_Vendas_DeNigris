@@ -434,7 +434,11 @@ export function KanbanBoard() {
                   Nenhum lead nesta etapa comercial
                 </div>
               )}
-                  {/* Drawer do Lead Selecionado */}
+            </div>
+          </div>
+        );
+      })}
+      </div>
       <LeadDrawer 
         isOpen={isDrawerOpen} 
         onClose={() => {
